@@ -40,17 +40,14 @@ public class UserServiceImpl implements UserDetailsService {
         if (userRepository.findByUsername(registrationDTO.getUsername()) != null) {
             throw new RuntimeException("Username already exists");
         }
-        if (userRepository.existsByEmail(registrationDTO.getEmail())) {
-            throw new RuntimeException("Email already exists");
-        }
-        if (registrationDTO.getPassword().length() < 8) {
-            throw new RuntimeException("Password must be at least 8 characters");
+        if (registrationDTO.getPassword().length() < 6) {
+            throw new RuntimeException("Password must be at least 6 characters");
         }
 
         User user = new User();
         user.setUsername(registrationDTO.getUsername());
         user.setPassword(passwordEncoder.encode(registrationDTO.getPassword()));
-        user.setEmail(registrationDTO.getEmail());
+        user.setEmail(registrationDTO.getEmail()); // 如果email为null也没关系
         user.setRole("USER");
         user.setApiKey(UUID.randomUUID().toString());
 
@@ -65,6 +62,21 @@ public class UserServiceImpl implements UserDetailsService {
             throw new UsernameNotFoundException("User not found");
         }
         return user; // 现在User实现了UserDetails，可以直接返回
+    }
+
+    public User findByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+
+    public User updateUser(User user) {
+        return userRepository.save(user);
+    }
+
+    public String generateApiKey(User user) {
+        String apiKey = UUID.randomUUID().toString();
+        user.setApiKey(apiKey);
+        userRepository.save(user);
+        return apiKey;
     }
 
     private Collection<? extends GrantedAuthority> getAuthorities(User user) {

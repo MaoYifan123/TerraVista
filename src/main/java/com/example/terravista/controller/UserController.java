@@ -30,9 +30,9 @@ public class UserController {
 
     @Autowired
     public UserController(@Lazy UserServiceImpl userService,
-                         JwtUtil jwtUtil,
-                         AuthenticationManager authenticationManager,
-                         @Lazy PasswordEncoder passwordEncoder) {
+                          JwtUtil jwtUtil,
+                          AuthenticationManager authenticationManager,
+                          @Lazy PasswordEncoder passwordEncoder) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.authenticationManager = authenticationManager;
@@ -80,10 +80,10 @@ public class UserController {
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             String username = auth.getName();
             User currentUser = userService.findByUsername(username);
-            
+
             // 只允许更新邮箱
             currentUser.setEmail(updatedUser.getEmail());
-            
+
             User savedUser = userService.updateUser(currentUser);
             return ResponseEntity.ok(savedUser);
         } catch (Exception e) {
