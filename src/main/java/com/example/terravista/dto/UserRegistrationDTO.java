@@ -9,7 +9,6 @@ public class UserRegistrationDTO {
     @NotBlank(message = "Password is required")
     private String password;
 
-    @NotBlank(message = "Email is required")
     private String email;
 
     // Getters and Setters

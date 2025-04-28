@@ -21,13 +21,12 @@ public class User implements UserDetails {
     private String password;
 
     @NotBlank
-    @Column(nullable = false)
     private String role;
 
     @Column(unique = true) // API Key 唯一
     private String apiKey;
 
-    @Column(nullable = false, unique = true) // 添加唯一约束
+    @Column(unique = true) // email可选，但如果提供则必须唯一
     private String email;
 
     // 实现 UserDetails 接口的方法

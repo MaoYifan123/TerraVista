@@ -12,12 +12,31 @@ const routes = [
     }
   },
   {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/Login.vue'),
+    meta: {
+      title: '登录'
+    }
+  },
+  {
+    path: '/register',
+    name: 'register',
+    component: () => import('../views/Register.vue'),
+    meta: {
+      title: '注册'
+    }
+  },
+  {
     path: '/about',
     name: 'about',
     // route level code-splitting
     // this generates a separate chunk (about.[hash].js) for this route
     // which is lazy-loaded when the route is visited.
-    component: () => import(/* webpackChunkName: "about" */ '../views/About.vue')
+    component: () => import(/* webpackChunkName: "about" */ '../views/About.vue'),
+    meta: {
+      title: '关于'
+    }
   },
   {
     path: '/map',
@@ -35,14 +54,21 @@ const router = createRouter({
   routes
 })
 
-// 动态设置页面标题
+// 路由守卫
 router.beforeEach((to, from, next) => {
-  if (to.meta.title) {
-    document.title = to.meta.title;
+  // 设置标题
+  document.title = to.meta.title || '默认标题'
+  
+  // 检查是否需要登录
+  const publicPages = ['/login', '/register']
+  const authRequired = !publicPages.includes(to.path)
+  const token = localStorage.getItem('token')
+
+  if (authRequired && !token) {
+    next('/login')
   } else {
-    document.title = '默认标题'; // 如果没有定义 title，则使用默认标题
+    next()
   }
-  next();
-});
+})
 
 export default router
