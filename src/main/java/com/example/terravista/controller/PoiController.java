@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/public/poi")
+@RequestMapping("/poi")
 public class PoiController {
 
     private final PoiService poiService;
@@ -22,7 +22,7 @@ public class PoiController {
         this.poiService = poiService;
     }
 
-    @GetMapping
+    @GetMapping("/all")
     public ResponseEntity<List<Poi>> getAllPois() {
         return ResponseEntity.ok(poiService.findAll());
     }

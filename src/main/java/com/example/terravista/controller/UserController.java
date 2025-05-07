@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/user")
+@RequestMapping("/user")
 public class UserController {
     private final UserServiceImpl userService;
     private final JwtUtil jwtUtil;
@@ -30,9 +30,9 @@ public class UserController {
 
     @Autowired
     public UserController(@Lazy UserServiceImpl userService,
-                          JwtUtil jwtUtil,
-                          AuthenticationManager authenticationManager,
-                          @Lazy PasswordEncoder passwordEncoder) {
+            JwtUtil jwtUtil,
+            AuthenticationManager authenticationManager,
+            @Lazy PasswordEncoder passwordEncoder) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
         this.authenticationManager = authenticationManager;
@@ -55,14 +55,15 @@ public class UserController {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             credentials.getUsername(),
-                            credentials.getPassword()
-                    )
-            );
+                            credentials.getPassword()));
             String token = jwtUtil.generateToken((UserDetails) authentication.getPrincipal());
             return ResponseEntity.ok(Map.of("token", token));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid credentials"));
+                    .body(Map.of("error", "Invalid username or password"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "An error occurred during authentication"));
         }
     }
 
@@ -115,4 +116,4 @@ public class UserController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-} 
+}

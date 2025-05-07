@@ -1,8 +1,10 @@
 package com.example.terravista.entity;
+
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -32,8 +34,7 @@ public class User implements UserDetails {
     // 实现 UserDetails 接口的方法
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // 这里将角色转换为 GrantedAuthority
-        return Collections.singletonList(() -> "ROLE_" + role);
+        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role));
     }
 
     @Override
@@ -55,17 +56,53 @@ public class User implements UserDetails {
     public boolean isEnabled() {
         return true; // 账户是否启用
     }
+
     // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
-    public String getApiKey() { return apiKey; }
-    public void setApiKey(String apiKey) { this.apiKey = apiKey; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
 }

@@ -14,81 +14,62 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
-@EnableMethodSecurity(
-        prePostEnabled = true,
-        securedEnabled = true,
-        jsr250Enabled = true
-)
+@EnableMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
 public class SecurityConfig {
 
-    @Autowired
-    private UserServiceImpl userServiceImpl;
+        @Autowired
+        private UserServiceImpl userServiceImpl;
 
-    @Autowired
-    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+        @Autowired
+        private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+        @Autowired
+        private JwtUtil jwtUtil;
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                .cors().configurationSource(corsConfigurationSource()).and()
-                .csrf().disable()
-                .exceptionHandling(exception -> exception
-                        .authenticationEntryPoint(jwtAuthenticationEntryPoint)
-                )
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/user/register", "/api/user/login").permitAll()
-                        .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/api/user/**").hasAnyRole("USER", "ADMIN")
-                        .anyRequest().authenticated()
-                )
-                .addFilter(new JwtAuthenticationFilter(
-                        authenticationManager(http.getSharedObject(AuthenticationConfiguration.class)),
-                        jwtUtil
-                ))
-                .addFilter(new JwtAuthorizationFilter(
-                        authenticationManager(http.getSharedObject(AuthenticationConfiguration.class)),
-                        userServiceImpl,
-                        jwtUtil
-                ));
+        @Bean
+        public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+                http
+                                .cors(cors -> {
+                                })
+                                .csrf(csrf -> csrf.disable())
+                                .exceptionHandling(exception -> exception
+                                                .authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                                .sessionManagement(session -> session
+                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .authorizeHttpRequests(auth -> auth
+                                                .requestMatchers("/user/login",
+                                                                "/user/register")
+                                                .permitAll()
+                                                .requestMatchers("/poi/all").permitAll()
+//                                                .requestMatchers("/poi/search").permitAll()
+                                                .requestMatchers("/poi/**").permitAll()
+                                                .requestMatchers("/public/**").permitAll()
+                                                .requestMatchers("/admin/**").hasRole("ADMIN")
+                                                .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
+                                                .anyRequest().authenticated())
+                                .addFilter(new JwtAuthenticationFilter(
+                                                authenticationManager(http
+                                                                .getSharedObject(AuthenticationConfiguration.class)),
+                                                jwtUtil))
+                                .addFilter(new JwtAuthorizationFilter(
+                                                authenticationManager(http
+                                                                .getSharedObject(AuthenticationConfiguration.class)),
+                                                userServiceImpl,
+                                                jwtUtil));
 
-        return http.build();
-    }
+                return http.build();
+        }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8080")); // 前端地址
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setAllowCredentials(true);
-        
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
-    }
+        @Bean
+        public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+                return authConfig.getAuthenticationManager();
+        }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
-        return authConfig.getAuthenticationManager();
-    }
-
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 }

@@ -24,12 +24,12 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
     public JwtAuthenticationFilter(AuthenticationManager authenticationManager, JwtUtil jwtUtil) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
-        setFilterProcessesUrl("/api/auth/login");
+        setFilterProcessesUrl("/api/user/login");
     }
 
     @Override
     public Authentication attemptAuthentication(HttpServletRequest request,
-                                                HttpServletResponse response) throws AuthenticationException {
+            HttpServletResponse response) throws AuthenticationException {
         try {
             UserCredentials creds = new ObjectMapper()
                     .readValue(request.getInputStream(), UserCredentials.class);
@@ -37,8 +37,7 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
                     new UsernamePasswordAuthenticationToken(
                             creds.getUsername(),
                             creds.getPassword(),
-                            Collections.emptyList())
-            );
+                            Collections.emptyList()));
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -46,11 +45,11 @@ public class JwtAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
     @Override
     protected void successfulAuthentication(HttpServletRequest request,
-                                            HttpServletResponse response,
-                                            FilterChain chain,
-                                            Authentication authResult) throws IOException {
+            HttpServletResponse response,
+            FilterChain chain,
+            Authentication authResult) throws IOException {
         String token = jwtUtil.generateToken((UserDetails) authResult.getPrincipal());
         response.addHeader("Authorization", "Bearer " + token);
-        response.getWriter().write("{\"token\": \"" + token + "\"}");  // 添加响应体
+        response.getWriter().write("{\"token\": \"" + token + "\"}"); // 添加响应体
     }
 }

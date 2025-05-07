@@ -1,36 +1,101 @@
 <template>
-  地图页面
   <div class="map-container">
-    <div id="map-container" style="width: 100%; height: 500px"></div>
+    <div id="map-container"></div>
+    <div class="poi-controls" v-if="map">
+      <el-input
+          v-model="searchQuery"
+          placeholder="搜索景点"
+          class="search-input"
+          @input="handleSearch"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <el-select v-model="selectedProvince" placeholder="选择省份" @change="handleSearch">
+        <el-option
+            v-for="province in provinces"
+            :key="province"
+            :label="province"
+            :value="province"
+        />
+      </el-select>
+      <el-button type="primary" @click="drawerVisible = true">
+        <el-icon><List /></el-icon>
+        景点列表
+      </el-button>
+    </div>
+
+    <!-- 添加侧边栏 -->
+    <el-drawer
+        v-model="drawerVisible"
+        title="景点列表"
+        direction="ltr"
+        size="300px"
+        :with-header="true"
+        :modal="false"
+        :show-close="true"
+    >
+      <div class="poi-list">
+        <el-scrollbar height="calc(100vh - 120px)">
+          <div v-for="poi in pois" :key="poi.id" class="poi-item" @click="focusPoi(poi)">
+            <el-card shadow="hover" :body-style="{ padding: '10px' }">
+              <div class="poi-item-content">
+                <img v-if="poi.imageUrl" :src="poi.imageUrl" class="poi-image" alt="景点图片">
+                <div class="poi-info">
+                  <h3>{{ poi.name }}</h3>
+                  <p>省份：{{ poi.province }}</p>
+                  <p>类别：{{ poi.category }}</p>
+                </div>
+              </div>
+            </el-card>
+          </div>
+        </el-scrollbar>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
 <script>
 import AMapLoader from '@amap/amap-jsapi-loader'
+import axios from 'axios'
+import { Search, List } from '@element-plus/icons-vue'
 
 export default {
   name: 'AMapDemo',
+  components: {
+    Search,
+    List
+  },
   data() {
     return {
       map: null,
-      markers: []
+      markers: [],
+      pois: [],
+      searchQuery: '',
+      selectedProvince: '',
+      provinces: [],
+      currentBounds: null,
+      drawerVisible: false,
+      currentLocationMarker: null
     }
   },
   mounted() {
-    this.initMap()
+    this.initMap().then(() => {
+      this.fetchPois()
+    })
   },
   methods: {
     initMap() {
-      AMapLoader.load({
-        key: '47d6f6593f6cf161673081c8ae38526b', // 替换为你的key
-        version: '2.0', // 指定要加载的 JSAPI 的版本
-        plugins: ['AMap.ToolBar', 'AMap.Scale', 'AMap.OverView', 'AMap.Geocoder'] // 需要使用的的插件列表
+      return AMapLoader.load({
+        key: process.env.VUE_APP_AMAP_API_KEY,
+        version: '2.0',
+        plugins: ['AMap.ToolBar', 'AMap.Scale', 'AMap.OverView', 'AMap.Geocoder', 'AMap.Geolocation']
       })
           .then((AMap) => {
             this.map = new AMap.Map('map-container', {
-              viewMode: '2D', // 默认使用 2D 模式
-              zoom: 11, // 初始化地图级别
-              center: [116.397428, 39.90923] // 初始化地图中心点位置（北京天安门）
+              viewMode: '2D',
+              zoom: 11
             })
 
             // 添加控件
@@ -38,12 +103,88 @@ export default {
             this.map.addControl(new AMap.Scale())
             this.map.addControl(new AMap.OverView())
 
-            // 添加标记点
-            this.addMarker(AMap)
+            // 获取当前位置
+            const geolocation = new AMap.Geolocation({
+              enableHighAccuracy: true,
+              timeout: 15000,  // 增加超时时间到15秒
+              buttonPosition: 'RB',
+              buttonOffset: new AMap.Pixel(10, 20),
+              zoomToAccuracy: true,
+              convert: true  // 自动偏移坐标
+            })
 
-            // 添加点击事件
-            this.map.on('click', (e) => {
-              console.log('点击位置经纬度:', e.lnglat)
+            this.map.addControl(geolocation)
+
+            // 添加定位成功事件监听
+            geolocation.on('complete', (data) => {
+              console.log('定位成功，详细信息:', {
+                position: data.position,
+                accuracy: data.accuracy,
+                location_type: data.location_type,
+                formattedAddress: data.formattedAddress
+              });
+              const position = [data.position.lng, data.position.lat];
+              this.map.setCenter(position);
+              this.map.setZoom(15);  // 设置更合适的缩放级别
+
+              // 清除旧标记
+              this.clearCurrentLocationMarker();
+
+              // 添加当前位置标记
+              this.currentLocationMarker = new AMap.Marker({
+                position: position,
+                icon: new AMap.Icon({
+                  size: new AMap.Size(32, 32),
+                  image: 'https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png',
+                  imageSize: new AMap.Size(32, 32)
+                }),
+                offset: new AMap.Pixel(-16, -16),
+                zIndex: 100,
+                animation: 'AMAP_ANIMATION_DROP'
+              });
+
+              this.map.add(this.currentLocationMarker);
+              console.log('Current position marker added at:', position);
+            });
+
+            // 添加定位错误事件监听
+            geolocation.on('error', (err) => {
+              console.error('定位失败，错误详情:', {
+                error: err,
+                errorCode: err.errorCode,
+                errorInfo: err.errorInfo
+              });
+              // 如果定位失败，使用默认位置（北京）
+              const defaultPosition = [116.397428, 39.90923];
+              this.map.setCenter(defaultPosition);
+              this.map.setZoom(11);  // 设置更合适的缩放级别
+
+              // 清除旧标记
+              this.clearCurrentLocationMarker();
+
+              // 添加默认位置标记
+              this.currentLocationMarker = new AMap.Marker({
+                position: defaultPosition,
+                icon: new AMap.Icon({
+                  size: new AMap.Size(32, 32),
+                  image: 'https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png',
+                  imageSize: new AMap.Size(32, 32)
+                }),
+                offset: new AMap.Pixel(-16, -16),
+                zIndex: 100,
+                animation: 'AMAP_ANIMATION_DROP'
+              });
+              this.map.add(this.currentLocationMarker);
+              console.log('Default position marker added at:', defaultPosition);
+            });
+
+            // 开始定位
+            geolocation.getCurrentPosition();
+
+            // 监听地图移动事件
+            this.map.on('moveend', () => {
+              this.currentBounds = this.map.getBounds()
+              this.handleSearch()
             })
           })
           .catch(e => {
@@ -51,27 +192,125 @@ export default {
           })
     },
 
-    addMarker(AMap) {
-      // 创建标记点
-      const marker = new AMap.Marker({
-        position: [116.397428, 39.90923], // 位置
-        title: '北京天安门'
-      })
+    async fetchPois() {
+      try {
+        const response = await axios.get('/api/poi/all')
+        this.pois = response.data
+        this.extractProvinces()
+        this.addPoiMarkers()
+      } catch (error) {
+        console.error('获取POI数据失败:', error)
+      }
+    },
 
-      // 创建信息窗口
-      const infoWindow = new AMap.InfoWindow({
-        content: '<div style="padding:5px;">这里是北京天安门</div>',
-        offset: new AMap.Pixel(0, -30)
-      })
+    async handleSearch() {
+      try {
+        const params = {
+          name: this.searchQuery || undefined,
+          province: this.selectedProvince || undefined
+        }
 
-      // 标记点点击事件
-      marker.on('click', () => {
-        infoWindow.open(this.map, marker.getPosition())
-      })
+        // 如果地图有边界，添加经纬度范围
+        if (this.currentBounds) {
+          const bounds = this.currentBounds
+          params.minLon = bounds.getSouthWest().lng
+          params.maxLon = bounds.getNorthEast().lng
+          params.minLat = bounds.getSouthWest().lat
+          params.maxLat = bounds.getNorthEast().lat
+        }
 
-      // 将标记添加到地图
-      this.map.add(marker)
-      this.markers.push(marker)
+        const response = await axios.get('/api/poi/search', { params })
+        this.clearMarkers()
+        this.pois = response.data.content
+        this.addPoiMarkers()
+      } catch (error) {
+        console.error('搜索POI失败:', error)
+      }
+    },
+
+    extractProvinces() {
+      const provinceSet = new Set()
+      this.pois.forEach(poi => {
+        if (poi.province) {
+          provinceSet.add(poi.province)
+        }
+      })
+      this.provinces = Array.from(provinceSet).sort()
+    },
+
+    addPoiMarkers() {
+      if (!this.map || !this.pois.length) return
+
+      this.pois.forEach(poi => {
+        const marker = new AMap.Marker({
+          position: [poi.longitudeBd, poi.latitudeBd],
+          title: poi.name,
+          icon: new AMap.Icon({
+            size: new AMap.Size(40, 40),
+            image: '/pos.jpg',
+            imageSize: new AMap.Size(40, 40),
+            anchor: new AMap.Pixel(20, 40)
+          })
+        })
+
+        // 创建信息窗体
+        const infoWindow = new AMap.InfoWindow({
+          content: `
+            <div style="padding:10px;">
+              <h3>${poi.name}</h3>
+              <p>省份：${poi.province}</p>
+              <p>类别：${poi.category}</p>
+              ${poi.imageUrl ? `<img src="${poi.imageUrl}" style="max-width:200px;margin-top:10px;">` : ''}
+              ${poi.officialUrl ? `<p><a href="${poi.officialUrl}" target="_blank">访问官网</a></p>` : ''}
+            </div>
+          `,
+          offset: new AMap.Pixel(0, -30)
+        })
+
+        // 标记点点击事件
+        marker.on('click', () => {
+          infoWindow.open(this.map, marker.getPosition())
+        })
+
+        // 将标记添加到地图
+        this.map.add(marker)
+        this.markers.push(marker)
+      })
+    },
+
+    clearMarkers() {
+      if (this.map) {
+        this.markers.forEach(marker => {
+          marker.setMap(null)
+        })
+        this.markers = []
+      }
+    },
+
+    clearCurrentLocationMarker() {
+      if (this.currentLocationMarker) {
+        this.map.remove(this.currentLocationMarker)
+        this.currentLocationMarker = null
+      }
+    },
+
+    // 添加新方法：聚焦到选中的POI
+    focusPoi(poi) {
+      if (!this.map) return
+      
+      const position = [poi.longitudeBd, poi.latitudeBd]
+      this.map.setCenter(position)
+      this.map.setZoom(15)
+      
+      // 找到对应的marker并触发点击事件
+      const marker = this.markers.find(m => {
+        const markerPos = m.getPosition()
+        return markerPos.lng === poi.longitudeBd && markerPos.lat === poi.latitudeBd
+      })
+      
+      if (marker) {
+        marker.emit('click')
+      }
     }
   },
 
@@ -83,3 +322,90 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.map-container {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+}
+
+#map-container {
+  width: 100%;
+  height: 100%;
+}
+
+.poi-controls {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  background: white;
+  padding: 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  display: flex;
+  gap: 10px;
+}
+
+.search-input {
+  width: 200px;
+}
+
+.el-select {
+  width: 120px;
+}
+
+/* 添加新的样式 */
+.poi-list {
+  padding: 10px;
+}
+
+.poi-item {
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.poi-item-content {
+  display: flex;
+  gap: 10px;
+}
+
+.poi-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.poi-info {
+  flex: 1;
+}
+
+.poi-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+}
+
+.poi-info p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* 确保抽屉组件样式正确 */
+:deep(.el-drawer) {
+  background-color: #fff;
+}
+
+:deep(.el-drawer__header) {
+  margin-bottom: 0;
+  padding: 16px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+:deep(.el-drawer__body) {
+  padding: 0;
+  height: calc(100% - 55px);
+}
+</style>

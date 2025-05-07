@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Collections;
 
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping("/admin")
 @io.github.resilience4j.ratelimiter.annotation.RateLimiter(name = "apiRateLimiter")
 public class AdminController {
     private final PoiService poiService;
