@@ -3,6 +3,7 @@
     <router-link to="/">Home</router-link> |
     <router-link to="/about">About</router-link> |
     <router-link to="/map">Map</router-link> |
+    <router-link to="/AIRecommend">AI</router-link> |
     <router-link to="/login" v-if="!isLoggedIn">Login</router-link>
     <a href="#" @click.prevent="handleLogout" v-else>Logout</a>
   </nav>

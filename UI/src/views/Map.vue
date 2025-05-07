@@ -24,6 +24,10 @@
         <el-icon><List /></el-icon>
         景点列表
       </el-button>
+      <el-button type="danger" @click="clearRoute" v-if="selectedPois.length > 0">
+        <el-icon><Delete /></el-icon>
+        清除路线
+      </el-button>
     </div>
 
     <!-- 添加侧边栏 -->
@@ -59,13 +63,14 @@
 <script>
 import AMapLoader from '@amap/amap-jsapi-loader'
 import axios from 'axios'
-import { Search, List } from '@element-plus/icons-vue'
+import { Search, List, Delete } from '@element-plus/icons-vue'
 
 export default {
   name: 'AMapDemo',
   components: {
     Search,
-    List
+    List,
+    Delete
   },
   data() {
     return {
@@ -77,7 +82,11 @@ export default {
       provinces: [],
       currentBounds: null,
       drawerVisible: false,
-      currentLocationMarker: null
+      currentLocationMarker: null,
+      selectedPois: [],
+      driving: null,
+      routeLine: null,
+      openInfoWindows: {}
     }
   },
   mounted() {
@@ -90,7 +99,7 @@ export default {
       return AMapLoader.load({
         key: process.env.VUE_APP_AMAP_API_KEY,
         version: '2.0',
-        plugins: ['AMap.ToolBar', 'AMap.Scale', 'AMap.OverView', 'AMap.Geocoder', 'AMap.Geolocation']
+        plugins: ['AMap.ToolBar', 'AMap.Scale', 'AMap.OverView', 'AMap.Geocoder', 'AMap.Geolocation', 'AMap.Driving']
       })
           .then((AMap) => {
             this.map = new AMap.Map('map-container', {
@@ -186,6 +195,13 @@ export default {
               this.currentBounds = this.map.getBounds()
               this.handleSearch()
             })
+
+            // 初始化驾车路线规划实例
+            this.driving = new AMap.Driving({
+              map: this.map,
+              policy: AMap.DrivingPolicy.LEAST_DISTANCE, // 最短距离
+              panel: false
+            });
           })
           .catch(e => {
             console.error('地图加载失败:', e)
@@ -195,7 +211,11 @@ export default {
     async fetchPois() {
       try {
         const response = await axios.get('/api/poi/all')
-        this.pois = response.data
+        this.pois = response.data.sort((a, b) => {
+          if (!a.province) return 1;
+          if (!b.province) return -1;
+          return a.province.localeCompare(b.province, 'zh-CN');
+        });
         this.extractProvinces()
         this.addPoiMarkers()
       } catch (error) {
@@ -219,7 +239,7 @@ export default {
           params.maxLat = bounds.getNorthEast().lat
         }
 
-        const response = await axios.get('/api/poi/search', { params })
+        const response = await axios.get('/api/poi/search', {params})
         this.clearMarkers()
         this.pois = response.data.content
         this.addPoiMarkers()
@@ -260,19 +280,20 @@ export default {
               <h3>${poi.name}</h3>
               <p>省份：${poi.province}</p>
               <p>类别：${poi.category}</p>
-              ${poi.imageUrl ? `<img src="${poi.imageUrl}" style="max-width:200px;margin-top:10px;">` : ''}
-              ${poi.officialUrl ? `<p><a href="${poi.officialUrl}" target="_blank">访问官网</a></p>` : ''}
             </div>
           `,
           offset: new AMap.Pixel(0, -30)
         })
 
+        // 保存到 marker 上
+        marker._poiId = poi.id
+        marker._infoWindow = infoWindow
+
         // 标记点点击事件
         marker.on('click', () => {
-          infoWindow.open(this.map, marker.getPosition())
+          this.handleMarkerClick(marker, poi)
         })
 
-        // 将标记添加到地图
         this.map.add(marker)
         this.markers.push(marker)
       })
@@ -297,19 +318,101 @@ export default {
     // 添加新方法：聚焦到选中的POI
     focusPoi(poi) {
       if (!this.map) return
-      
+
       const position = [poi.longitudeBd, poi.latitudeBd]
       this.map.setCenter(position)
       this.map.setZoom(15)
-      
+
       // 找到对应的marker并触发点击事件
-      const marker = this.markers.find(m => {
-        const markerPos = m.getPosition()
-        return markerPos.lng === poi.longitudeBd && markerPos.lat === poi.latitudeBd
-      })
-      
+      const marker = this.markers.find(m => m._poiId === poi.id)
+
       if (marker) {
-        marker.emit('click')
+        this.handleMarkerClick(marker, poi)
+      }
+    },
+
+    // 新增：更新路线
+    updateRoute() {
+      if (this.selectedPois.length < 2) return
+
+      // 清除之前的路线
+      if (this.routeLine) {
+        this.map.remove(this.routeLine)
+        this.routeLine = null
+      }
+
+      // 准备路线点
+      const waypoints = this.selectedPois.map(poi => [poi.longitudeBd, poi.latitudeBd])
+
+      // 规划路线
+      this.driving.search(
+          waypoints[0],
+          waypoints[waypoints.length - 1],
+          {
+            waypoints: waypoints.slice(1, -1)
+          },
+          (status, result) => {
+            if (status === 'complete') {
+              console.log('路线规划成功:', result)
+              // 获取路线
+              const route = result.routes[0]
+              if (route) {
+                // 创建路线对象
+                const path = []
+                route.steps.forEach(step => {
+                  path.push(...step.path)
+                })
+
+                this.routeLine = new AMap.Polyline({
+                  path: path,
+                  strokeColor: '#3366FF', // 蓝色
+                  strokeWeight: 6,
+                  strokeOpacity: 0.8,
+                  showDir: true, // 显示方向
+                  lineJoin: 'round', // 折线拐点连接处样式
+                  lineCap: 'round' // 折线两端线帽的绘制样式
+                })
+
+                // 将路线添加到地图
+                this.map.add(this.routeLine)
+
+                // 调整地图视野以包含所有路线
+                this.map.setFitView([this.routeLine])
+              }
+            } else {
+              console.error('获取驾车数据失败：', result)
+            }
+          }
+      )
+    },
+
+    // 新增：清除路线
+    clearRoute() {
+      if (this.routeLine) {
+        this.map.remove(this.routeLine)
+        this.routeLine = null
+      }
+      this.selectedPois = []
+    },
+
+    handleMarkerClick(marker, poi) {
+      const id = poi.id
+      // 如果已打开，则关闭
+      if (this.openInfoWindows[id]) {
+        this.openInfoWindows[id].close()
+        delete this.openInfoWindows[id]
+        // 也从 selectedPois 移除
+        this.selectedPois = this.selectedPois.filter(p => p.id !== id)
+        this.updateRoute()
+      } else {
+        // 打开新的 InfoWindow
+        marker._infoWindow.open(this.map, marker.getPosition())
+        this.openInfoWindows[id] = marker._infoWindow
+        // 添加到 selectedPois
+        if (!this.selectedPois.find(p => p.id === id)) {
+          this.selectedPois.push(poi)
+          this.updateRoute()
+        }
       }
     }
   },
@@ -343,7 +446,7 @@ export default {
   background: white;
   padding: 10px;
   border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   display: flex;
   gap: 10px;
 }

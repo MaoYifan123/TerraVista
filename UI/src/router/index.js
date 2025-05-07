@@ -46,7 +46,15 @@ const routes = [
       title: '地图',
       // keepAlive: true
     }
-  }
+  },
+  {
+    path: '/AIRecommend',
+    name: 'AI',
+    component: () => import('../views/AIRecommend.vue'),
+    meta: {
+      title: 'AI推荐',
+    }
+  },
 ]
 
 const router = createRouter({
@@ -58,7 +66,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   // 设置标题
   document.title = to.meta.title || '默认标题'
-  
+
   // 检查是否需要登录
   const publicPages = ['/login', '/register']
   const authRequired = !publicPages.includes(to.path)

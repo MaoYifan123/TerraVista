@@ -32,33 +32,36 @@ public class SecurityConfig {
         @Bean
         public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
                 http
-                                .cors(cors -> {
-                                })
-                                .csrf(csrf -> csrf.disable())
-                                .exceptionHandling(exception -> exception
-                                                .authenticationEntryPoint(jwtAuthenticationEntryPoint))
-                                .sessionManagement(session -> session
-                                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .authorizeHttpRequests(auth -> auth
-                                                .requestMatchers("/user/login",
-                                                                "/user/register")
-                                                .permitAll()
-                                                .requestMatchers("/poi/all").permitAll()
-//                                                .requestMatchers("/poi/search").permitAll()
-                                                .requestMatchers("/poi/**").permitAll()
-                                                .requestMatchers("/public/**").permitAll()
-                                                .requestMatchers("/admin/**").hasRole("ADMIN")
-                                                .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
-                                                .anyRequest().authenticated())
-                                .addFilter(new JwtAuthenticationFilter(
-                                                authenticationManager(http
-                                                                .getSharedObject(AuthenticationConfiguration.class)),
-                                                jwtUtil))
-                                .addFilter(new JwtAuthorizationFilter(
-                                                authenticationManager(http
-                                                                .getSharedObject(AuthenticationConfiguration.class)),
-                                                userServiceImpl,
-                                                jwtUtil));
+                        .cors(cors -> {
+                        })
+                        .csrf(csrf -> csrf.disable())
+                        .exceptionHandling(exception -> exception
+                                .authenticationEntryPoint(jwtAuthenticationEntryPoint))
+                        .sessionManagement(session -> session
+                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                        .authorizeHttpRequests(auth -> auth
+                                .requestMatchers("/user/login",
+                                        "/user/register")
+                                .permitAll()
+                                .requestMatchers("/poi/all").permitAll()
+                                // .requestMatchers("/poi/search").permitAll()
+                                .requestMatchers("/poi/**").permitAll()
+                                .requestMatchers("/public/**").permitAll()
+                                .requestMatchers("/admin/**").hasRole("ADMIN")
+                                .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
+                                // 仅允许用户、管理员登陆后访问
+                                // .requestMatchers("/ai/**").hasAnyRole("USER", "ADMIN")
+                                .requestMatchers("/ai/**").permitAll()
+                                .anyRequest().authenticated())
+                        .addFilter(new JwtAuthenticationFilter(
+                                authenticationManager(http
+                                        .getSharedObject(AuthenticationConfiguration.class)),
+                                jwtUtil))
+                        .addFilter(new JwtAuthorizationFilter(
+                                authenticationManager(http
+                                        .getSharedObject(AuthenticationConfiguration.class)),
+                                userServiceImpl,
+                                jwtUtil));
 
                 return http.build();
         }
