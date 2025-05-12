@@ -5,7 +5,9 @@ import com.example.terravista.dto.UserRegistrationDTO;
 import com.example.terravista.entity.User;
 import com.example.terravista.service.UserServiceImpl;
 import com.example.terravista.util.JwtUtil;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +52,7 @@ public class UserController {
     }
 
     @PostMapping("/login")
+    @RateLimiter(name = "apiRateLimiter")
     public ResponseEntity<Map<String, String>> login(@RequestBody UserCredentials credentials) {
         try {
             Authentication authentication = authenticationManager.authenticate(
@@ -60,10 +63,10 @@ public class UserController {
             return ResponseEntity.ok(Map.of("token", token));
         } catch (BadCredentialsException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid username or password"));
+                    .body(Map.of("error", "无效的用户名或密码"));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "An error occurred during authentication"));
+                    .body(Map.of("error", "无权限"));
         }
     }
 
