@@ -39,11 +39,13 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '../utils/request'
+import { useUserStore } from '@/stores/user'
 
 export default {
   name: 'LoginView',
   setup() {
     const router = useRouter()
+    const userStore = useUserStore()
     const loading = ref(false)
     const error = ref('')
     const form = reactive({
@@ -52,17 +54,15 @@ export default {
     })
 
     const handleLogin = async () => {
-      try {
-        loading.value = true
-        error.value = ''
-        const response = await request.post('/user/login', form)
-        localStorage.setItem('token', response.data.token)
+      loading.value = true
+      error.value = ''
+      const success = await userStore.login(form.username, form.password)
+      if (success) {
         router.push('/')
-      } catch (err) {
-        error.value = err.response?.data?.error || '登录失败，请重试'
-      } finally {
-        loading.value = false
+      } else {
+        error.value = '登录失败，请重试'
       }
+      loading.value = false
     }
 
     return {

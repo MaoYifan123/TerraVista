@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/Home.vue'
+import { useUserStore } from '@/stores/user'
 
 const routes = [
   {
@@ -55,6 +56,15 @@ const routes = [
       title: 'AI推荐',
     }
   },
+  {
+    path: '/admin/pois',
+    name: 'admin-poi-management',
+    component: () => import('../views/AdminPoiManagement.vue'),
+    meta: {
+      title: 'POI管理',
+      requiresAdmin: true
+    }
+  }
 ]
 
 const router = createRouter({
@@ -63,20 +73,28 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   // 设置标题
   document.title = to.meta.title || '默认标题'
 
-  // 检查是否需要登录
   const publicPages = ['/login', '/register']
   const authRequired = !publicPages.includes(to.path)
-  const token = localStorage.getItem('token')
+  const userStore = useUserStore()
 
-  if (authRequired && !token) {
-    next('/login')
-  } else {
-    next()
+  // 如果有token但未加载用户信息，先获取用户信息
+  if (userStore.token && !userStore.user) {
+    await userStore.fetchUserInfo()
   }
+
+  if (authRequired && !userStore.isLoggedIn) {
+    return next('/login')
+  }
+
+  if (to.meta.requiresAdmin && !userStore.isAdmin) {
+    return next('/')
+  }
+
+  next()
 })
 
 export default router

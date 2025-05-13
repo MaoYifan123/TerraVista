@@ -55,17 +55,63 @@
       </div>
 
       <div class="chat-input">
+        <div class="tag-selectors">
+          <el-select
+              v-model="selectedType"
+              placeholder="景点类型"
+              clearable
+              class="tag-select"
+          >
+            <el-option
+                v-for="item in typeOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+            />
+          </el-select>
+          <el-select
+              v-model="selectedMonth"
+              placeholder="推荐时间"
+              clearable
+              class="tag-select"
+          >
+            <el-option
+                v-for="item in monthOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+            />
+          </el-select>
+          <el-select
+              v-model="selectedLocation"
+              placeholder="地点"
+              clearable
+              class="tag-select"
+          >
+            <el-option
+                v-for="item in locationOptions"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+            />
+          </el-select>
+          <el-button
+              type="primary"
+              @click="sendMessage"
+              :loading="loading"
+              :disabled="!canSend"
+          >
+            发送
+          </el-button>
+        </div>
         <el-input
             v-model="userInput"
             type="textarea"
             :rows="3"
-            placeholder="请输入您的问题，例如：我想去云南旅游，有什么推荐？"
+            placeholder="请输入您的问题，例如：有什么推荐？"
             @keyup.enter.ctrl="sendMessage"
         />
         <div class="input-actions">
-          <el-button type="primary" @click="sendMessage" :loading="loading">
-            发送
-          </el-button>
           <span class="input-tip">按 Ctrl + Enter 发送</span>
         </div>
       </div>
@@ -80,7 +126,7 @@
 
 <script>
 import axios from 'axios'
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import LZString from 'lz-string' // 确保已安装 lz-string
 
@@ -92,6 +138,50 @@ export default {
     const loading = ref(false)
     const userInput = ref('')
     const chatMessages = ref(null)
+
+    // 标签选项数据
+    const typeOptions = ref([
+      { value: '自然风光', label: '自然风光' },
+      { value: '历史古迹', label: '历史古迹' },
+      { value: '主题乐园', label: '主题乐园' },
+      { value: '城市观光', label: '城市观光' },
+      { value: '美食购物', label: '美食购物' }
+    ])
+
+    const monthOptions = ref([
+      { value: '一月', label: '一月' },
+      { value: '二月', label: '二月' },
+      { value: '三月', label: '三月' },
+      { value: '四月', label: '四月' },
+      { value: '五月', label: '五月' },
+      { value: '六月', label: '六月' },
+      { value: '七月', label: '七月' },
+      { value: '八月', label: '八月' },
+      { value: '九月', label: '九月' },
+      { value: '十月', label: '十月' },
+      { value: '十一月', label: '十一月' },
+      { value: '十二月', label: '十二月' }
+    ])
+
+    const locationOptions = ref([
+      { value: '上海', label: '上海' },
+      { value: '北京', label: '北京' },
+      { value: '广州', label: '广州' },
+      { value: '深圳', label: '深圳' },
+      { value: '杭州', label: '杭州' },
+      { value: '成都', label: '成都' },
+      { value: '重庆', label: '重庆' },
+      { value: '西安', label: '西安' }
+    ])
+
+    const selectedType = ref('')
+    const selectedMonth = ref('')
+    const selectedLocation = ref('')
+
+    // 判断是否可以发送
+    const canSend = computed(() => {
+      return selectedLocation.value || selectedType.value || selectedMonth.value || userInput.value.trim()
+    })
 
     // 修复1: 将存储方法提升到setup顶层
     const loadConversationHistory = () => {
@@ -231,10 +321,21 @@ export default {
     };
 
     const sendMessage = async () => {
-      if (!userInput.value.trim()) return
+      if (!canSend.value) return
 
-      const userMessage = userInput.value.trim()
-      const userMessage2 = `${userInput.value.trim()}，请加上最佳观赏时间`
+      // 构建带标签的消息
+      let messageWithTags = userInput.value.trim()
+      if (selectedLocation.value) {
+        messageWithTags = `我想去${selectedLocation.value}旅游，${messageWithTags || '有什么推荐'}`
+      }
+      if (selectedType.value) {
+        messageWithTags += `，想参观${selectedType.value}类型的景点`
+      }
+      if (selectedMonth.value) {
+        messageWithTags += `，计划在${selectedMonth.value}去`
+      }
+
+      const userMessage = messageWithTags
       userInput.value = ''
 
       conversationHistory.value.push({
@@ -247,16 +348,14 @@ export default {
 
       try {
         const response = await axios.post('/api/ai/chat', {
-          message: userMessage2,
+          message: userMessage,
           history: conversationHistory.value
         })
 
-        // 处理响应（移除内部重复定义的handleAIResponse）
         if (handleAIResponse(response.data)) {
           return
         }
 
-        // 降级处理
         const aiMessage = {
           role: 'assistant',
           content: typeof response.data === 'string'
@@ -284,7 +383,14 @@ export default {
       userInput,
       chatMessages,
       sendMessage,
-      clearHistory
+      clearHistory,
+      typeOptions,
+      monthOptions,
+      locationOptions,
+      selectedType,
+      selectedMonth,
+      selectedLocation,
+      canSend
     }
   }
 }
@@ -496,5 +602,16 @@ export default {
 .ai-message {
   max-width: 80%;
   width: 100%;
+}
+
+.tag-selectors {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  align-items: center;
+}
+
+.tag-select {
+  width: 150px;
 }
 </style>
