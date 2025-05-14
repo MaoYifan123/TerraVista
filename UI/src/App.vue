@@ -4,6 +4,7 @@
     <router-link to="/about">About</router-link> |
     <router-link to="/map">Map</router-link> |
     <router-link to="/AIRecommend">AI</router-link> |
+    <router-link to="/admin/pois" v-if="isAdmin">POI管理</router-link> |
     <router-link to="/login" v-if="!isLoggedIn">Login</router-link>
     <a href="#" @click.prevent="handleLogout" v-else>Logout</a>
   </nav>
@@ -11,31 +12,32 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 export default {
   name: 'App',
   setup() {
     const router = useRouter()
-    const isLoggedIn = ref(false)
-
-    const checkLoginStatus = () => {
-      isLoggedIn.value = !!localStorage.getItem('token')
-    }
+    const userStore = useUserStore()
+    const isLoggedIn = computed(() => userStore.isLoggedIn)
+    const isAdmin = computed(() => userStore.isAdmin)
 
     const handleLogout = () => {
-      localStorage.removeItem('token')
-      isLoggedIn.value = false
+      userStore.logout()
       router.push('/login')
     }
 
     onMounted(() => {
-      checkLoginStatus()
+      if (userStore.token && !userStore.user) {
+        userStore.fetchUserInfo()
+      }
     })
 
     return {
       isLoggedIn,
+      isAdmin,
       handleLogout
     }
   }

@@ -46,8 +46,8 @@ public class UserServiceImpl implements UserDetailsService {
 
         User user = new User();
         user.setUsername(registrationDTO.getUsername());
-        user.setPassword(passwordEncoder.encode(registrationDTO.getPassword()));
-        user.setEmail(registrationDTO.getEmail()); // 如果email为null也没关系
+        user.setPassword(registrationDTO.getPassword()); // 直接存储原始密码
+        user.setEmail(registrationDTO.getEmail());
         user.setRole("USER");
         user.setApiKey(UUID.randomUUID().toString());
 
