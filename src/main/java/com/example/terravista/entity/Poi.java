@@ -11,12 +11,18 @@ public class Poi {
     private String name;
     private String province;
     private String category; // 5A景区
-    private Double longitudeBd;
-    private Double latitudeBd;
+    @Column(name = "longitude_bd")
+    private Double longitudeBd; // 百度坐标系经度
+    @Column(name = "latitude_bd")
+    private Double latitudeBd; // 百度坐标系纬度
+    @Column(name = "longitude_bd2")
     private Double longitudeBd2;
+    @Column(name = "latitude_bd2")
     private Double latitudeBd2;
-    private String imageUrl;  // 扩展信息：图片链接
+    private String imageUrl; // 扩展信息：图片链接
     private String officialUrl; // 扩展信息：官网地址
+    private Double longitudeGcj; // 国测局坐标系经度
+    private Double latitudeGcj; // 国测局坐标系纬度
 
     // Getters and Setters
     public Long getId() {
@@ -97,5 +103,21 @@ public class Poi {
 
     public void setOfficialUrl(String officialUrl) {
         this.officialUrl = officialUrl;
+    }
+
+    public Double getLongitudeGcj() {
+        return longitudeGcj;
+    }
+
+    public void setLongitudeGcj(Double longitudeGcj) {
+        this.longitudeGcj = longitudeGcj;
+    }
+
+    public Double getLatitudeGcj() {
+        return latitudeGcj;
+    }
+
+    public void setLatitudeGcj(Double latitudeGcj) {
+        this.latitudeGcj = latitudeGcj;
     }
 }
