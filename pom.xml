@@ -27,7 +27,7 @@
         <url/>
     </scm>
     <properties>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
     </properties>
 
     <dependencies>
@@ -104,27 +104,10 @@
             <scope>runtime</scope>
         </dependency>
         <!-- Resilience4j 限流 -->
-<!--        <dependency>-->
-<!--            <groupId>io.github.resilience4j</groupId>-->
-<!--            <artifactId>resilience4j-ratelimiter</artifactId>-->
-<!--            <version>2.1.0</version> &lt;!&ndash; 使用最新版本 &ndash;&gt;-->
-<!--        </dependency>-->
-<!--        <dependency>-->
-<!--            <groupId>io.github.resilience4j</groupId>-->
-<!--            <artifactId>resilience4j-spring-boot2</artifactId>-->
-<!--            <version>1.7.1</version> &lt;!&ndash; 适用于 Spring Boot 2.5.x &ndash;&gt;-->
-<!--        </dependency>-->
         <dependency>
-            <!-- Resilience4j for Spring Boot 3 -->
             <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-spring-boot3</artifactId>
-            <version>2.0.2</version>
-        </dependency>
-        <dependency>
-            <!-- SpringDoc (Swagger) -->
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-            <version>2.1.0</version>
+            <artifactId>resilience4j-ratelimiter</artifactId>
+            <version>2.1.0</version> <!-- 使用最新版本 -->
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -243,6 +226,10 @@
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot2</artifactId>
             <version>1.7.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
     </dependencies>
 

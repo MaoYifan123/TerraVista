@@ -51,6 +51,8 @@ public class SecurityConfig {
                                 // 仅允许用户、管理员登陆后访问
                                 // .requestMatchers("/ai/**").hasAnyRole("USER", "ADMIN")
                                 .requestMatchers("/ai/**").permitAll()
+                                .requestMatchers("/poiinfo/**").permitAll()
+                                .requestMatchers("/search/**").permitAll()
                                 .anyRequest().authenticated())
                         .addFilter(new JwtAuthenticationFilter(
                                 authenticationManager(http
@@ -64,6 +66,7 @@ public class SecurityConfig {
 
                 return http.build();
         }
+
 
         @Bean
         public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {

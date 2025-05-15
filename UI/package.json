@@ -16,9 +16,11 @@
     "core-js": "^3.8.3",
     "element-plus": "^2.9.9",
     "lz-string": "^1.5.0",
+    "pinia": "^3.0.2",
     "vue": "^3.2.13",
     "vue-cli-service": "^5.0.10",
     "vue-router": "^4.0.3",
+    "vuedraggable": "^2.24.3",
     "vuex": "^4.0.0"
   },
   "devDependencies": {
