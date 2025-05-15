@@ -29,8 +29,8 @@
       <el-table-column prop="category" label="分类" width="150" />
       <el-table-column label="坐标" width="220">
         <template #default="{row}">
-          <div>经度: {{ row.longitude }}</div>
-          <div>纬度: {{ row.latitude }}</div>
+          <div>经度: {{ row.longitudeBd }}</div>
+          <div>纬度: {{ row.latitudeBd }}</div>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="200" fixed="right">
@@ -90,22 +90,22 @@
         <el-form-item label="分类" prop="category">
           <el-input v-model="currentPoi.category" />
         </el-form-item>
-        <el-form-item label="经度" prop="longitude">
+        <el-form-item label="经度" prop="longitudeBd">
           <el-input-number
-              v-model="currentPoi.longitude"
+              v-model="currentPoi.longitudeBd"
               :precision="6"
               :step="0.000001"
           />
         </el-form-item>
-        <el-form-item label="纬度" prop="latitude">
+        <el-form-item label="纬度" prop="latitudeBd">
           <el-input-number
-              v-model="currentPoi.latitude"
+              v-model="currentPoi.latitudeBd"
               :precision="6"
               :step="0.000001"
           />
         </el-form-item>
         <el-form-item label="图片URL">
-          <el-input v-model="currentPoi.image" />
+          <el-input v-model="currentPoi.imageUrl" />
         </el-form-item>
       </el-form>
 
@@ -144,17 +144,17 @@ const currentPoi = ref({
   name: '',
   province: '',
   category: '',
-  longitude: null,
-  latitude: null,
-  image: ''
+  longitudeBd: null,
+  latitudeBd: null,
+  imageUrl: ''
 })
 
 const formRules = reactive({
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   province: [{ required: true, message: '请选择省份', trigger: 'change' }],
   category: [{ required: true, message: '请输入分类', trigger: 'blur' }],
-  longitude: [{ required: true, message: '请输入经度', trigger: 'blur' }],
-  latitude: [{ required: true, message: '请输入纬度', trigger: 'blur' }]
+  longitudeBd: [{ required: true, message: '请输入经度', trigger: 'blur' }],
+  latitudeBd: [{ required: true, message: '请输入纬度', trigger: 'blur' }]
 })
 
 const loadPois = async () => {
@@ -184,9 +184,9 @@ const handleCreate = () => {
     name: '',
     province: '',
     category: '',
-    longitude: null,
-    latitude: null,
-    image: ''
+    longitudeBd: null,
+    latitudeBd: null,
+    imageUrl: ''
   }
   dialogVisible.value = true
 }
