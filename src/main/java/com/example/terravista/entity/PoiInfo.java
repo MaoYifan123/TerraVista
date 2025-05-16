@@ -1,12 +1,20 @@
 package com.example.terravista.entity;
 
 import jakarta.persistence.*;
-
+import java.util.ArrayList;
 import java.util.List;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Entity
 @Table(name = "poi_info")
 public class PoiInfo {
+    private static final Logger logger = LoggerFactory.getLogger(PoiInfo.class);
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -20,15 +28,17 @@ public class PoiInfo {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @ElementCollection
-    @CollectionTable(name = "poi_tags", joinColumns = @JoinColumn(name = "poi_info_id"))
-    @Column(name = "tag")
-    private List<String> tags;
+    @Transient
+    private List<String> tags = new ArrayList<>();
 
-    @ElementCollection
-    @CollectionTable(name = "poi_photos", joinColumns = @JoinColumn(name = "poi_info_id"))
-    @Column(name = "photo_url", columnDefinition = "TEXT")
-    private List<String> photos;
+    @Column(name = "tags", columnDefinition = "JSON")
+    private String tagsJson;
+
+    @Transient
+    private List<String> photos = new ArrayList<>();
+
+    @Column(name = "photos", columnDefinition = "JSON")
+    private String photosJson;
 
     @Column(name = "website", columnDefinition = "TEXT")
     private String website; // 官网地址
@@ -85,19 +95,45 @@ public class PoiInfo {
     }
 
     public List<String> getTags() {
+        if (tags == null || tags.isEmpty()) {
+            tags = convertJsonToList(tagsJson);
+        }
         return tags;
     }
 
     public void setTags(List<String> tags) {
         this.tags = tags;
+        this.tagsJson = convertListToJson(tags);
     }
 
     public List<String> getPhotos() {
+        if (photos == null || photos.isEmpty()) {
+            photos = convertJsonToList(photosJson);
+        }
         return photos;
     }
 
     public void setPhotos(List<String> photos) {
         this.photos = photos;
+        this.photosJson = convertListToJson(photos);
+    }
+
+    public String getTagsJson() {
+        return tagsJson;
+    }
+
+    public void setTagsJson(String tagsJson) {
+        this.tagsJson = tagsJson;
+        this.tags = convertJsonToList(tagsJson);
+    }
+
+    public String getPhotosJson() {
+        return photosJson;
+    }
+
+    public void setPhotosJson(String photosJson) {
+        this.photosJson = photosJson;
+        this.photos = convertJsonToList(photosJson);
     }
 
     public String getWebsite() {
@@ -154,5 +190,42 @@ public class PoiInfo {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    // Helper methods for JSON conversion
+    @PrePersist
+    @PreUpdate
+    private void beforeSave() {
+        if (tags != null) {
+            this.tagsJson = convertListToJson(tags);
+        }
+        if (photos != null) {
+            this.photosJson = convertListToJson(photos);
+        }
+    }
+
+    private String convertListToJson(List<String> list) {
+        if (list == null || list.isEmpty()) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(list);
+        } catch (JsonProcessingException e) {
+            logger.error("Error converting list to JSON", e);
+            return "[]";
+        }
+    }
+
+    private List<String> convertJsonToList(String json) {
+        if (json == null || json.isEmpty() || json.equals("null")) {
+            return new ArrayList<>();
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<String>>() {
+            });
+        } catch (JsonProcessingException e) {
+            logger.error("Error converting JSON to list: {}", json, e);
+            return new ArrayList<>();
+        }
     }
 }

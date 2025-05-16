@@ -385,11 +385,11 @@
             </div>
           </div>
         </template>
-        
+
         <div v-if="selectedPois.length === 0" class="empty-message">
           <el-empty description="暂无选中景点，请从地图上选择景点" />
         </div>
-        
+
         <div v-else class="selected-pois-list">
           <div class="route-info">
             <el-alert
@@ -399,27 +399,27 @@
                 show-icon
             />
           </div>
-          
+
           <!-- 使用v-for和上下移动按钮替代拖拽 -->
           <div v-for="(poi, index) in selectedPois" :key="poi.id" class="selected-poi-item">
             <el-card shadow="hover" class="selected-poi-card">
               <div class="selected-poi-content">
                 <div class="move-controls">
                   <el-button
-                    type="info"
-                    size="small"
-                    circle
-                    :disabled="index === 0"
-                    @click="movePoi(index, 'up')"
+                      type="info"
+                      size="small"
+                      circle
+                      :disabled="index === 0"
+                      @click="movePoi(index, 'up')"
                   >
                     <el-icon><ArrowUp /></el-icon>
                   </el-button>
                   <el-button
-                    type="info"
-                    size="small"
-                    circle
-                    :disabled="index === selectedPois.length - 1"
-                    @click="movePoi(index, 'down')"
+                      type="info"
+                      size="small"
+                      circle
+                      :disabled="index === selectedPois.length - 1"
+                      @click="movePoi(index, 'down')"
                   >
                     <el-icon><ArrowDown /></el-icon>
                   </el-button>
@@ -434,10 +434,10 @@
                       <el-radio-button label="waypoint">途经点</el-radio-button>
                     </el-radio-group>
                     <el-button
-                      type="danger"
-                      size="small"
-                      circle
-                      @click="removePoi(index)"
+                        type="danger"
+                        size="small"
+                        circle
+                        @click="removePoi(index)"
                     >
                       <el-icon><Delete /></el-icon>
                     </el-button>
@@ -609,7 +609,7 @@ export default {
               viewMode: '2D',
               zoom: 11
             })
-            
+
             // 保存默认图层引用
             this.normalLayer = this.map.getLayers()[0]
 
@@ -978,7 +978,7 @@ export default {
           this.map.add(marker);
         });
       }
-      
+
       // 确保地图类型与之前一致
       if (currentSatelliteState !== this.isSatelliteView) {
         this.isSatelliteView = currentSatelliteState;
@@ -1489,14 +1489,14 @@ export default {
           name: poi.name,    // 确保有名称
           province: poi.province // 确保有省份
         })
-        
+
         console.log('添加POI到选中列表:', {
           id: id,
           name: poi.name,
           role: 'waypoint',
           listLength: this.selectedPois.length
         });
-        
+
         if (poi.category === '4A') {
           this.addPoiMarkers()
         }
@@ -1740,26 +1740,26 @@ export default {
     // 添加新方法：显示路线
     showRoute() {
       console.log('打开路线规划，选中景点数量:', this.selectedPois.length);
-      
+
       // 确保至少有一个选中的景点
       if (this.selectedPois.length === 0) {
         this.$message.warning('请先选择至少一个景点');
         return;
       }
-      
+
       // 确保每个selectedPois都有role属性
       this.selectedPois.forEach(poi => {
         if (!poi.role) {
           poi.role = 'waypoint';
         }
       });
-      
+
       // 先设置路线可见状态
       this.isRouteVisible = true;
-      
+
       // 然后打开抽屉并更新路线
       this.rightDrawerVisible = true;
-      
+
       // 延迟绘制路线以确保UI先渲染
       setTimeout(() => {
         this.updateRoute();
@@ -2727,25 +2727,25 @@ export default {
       // 处理边界情况
       if (direction === 'up' && index === 0) return;
       if (direction === 'down' && index === this.selectedPois.length - 1) return;
-      
+
       const newIndex = direction === 'up' ? index - 1 : index + 1;
-      
+
       // 创建一个新数组
       const newPois = [...this.selectedPois];
-      
+
       // 交换位置
       const temp = newPois[index];
       newPois[index] = newPois[newIndex];
       newPois[newIndex] = temp;
-      
+
       // 更新数组
       this.selectedPois = newPois;
-      
+
       // 如果路线可见，则更新路线
       if (this.isRouteVisible) {
         this.updateRoute();
       }
-      
+
       console.log('已移动POI顺序:', {
         direction: direction,
         movedPoi: this.selectedPois[newIndex].name,
@@ -2757,27 +2757,27 @@ export default {
     // 切换地图类型（标准图/卫星图）
     toggleMapType() {
       if (!this.map) return;
-      
+
       try {
         // 先获取当前地图的中心点和缩放级别，以便切换后保持视图
         const center = this.map.getCenter();
         const zoom = this.map.getZoom();
-        
+
         if (this.isSatelliteView) {
           console.log('切换到卫星图');
-          
+
           // 确保移除所有标准图层
-          const baseLayers = this.map.getLayers().filter(layer => 
-            layer instanceof AMap.TileLayer && 
-            !(layer instanceof AMap.TileLayer.Satellite) && 
-            !(layer instanceof AMap.TileLayer.RoadNet)
+          const baseLayers = this.map.getLayers().filter(layer =>
+              layer instanceof AMap.TileLayer &&
+              !(layer instanceof AMap.TileLayer.Satellite) &&
+              !(layer instanceof AMap.TileLayer.RoadNet)
           );
-          
+
           if (baseLayers.length > 0) {
             console.log('移除标准图层:', baseLayers.length);
             baseLayers.forEach(layer => this.map.remove(layer));
           }
-          
+
           // 添加卫星图层
           if (!this.satelliteLayer) {
             console.log('创建新的卫星图层');
@@ -2786,7 +2786,7 @@ export default {
               opacity: 1
             });
           }
-          
+
           // 添加路网图层提高可读性
           if (!this.roadNetLayer) {
             console.log('创建新的路网图层');
@@ -2795,24 +2795,24 @@ export default {
               opacity: 0.8
             });
           }
-          
+
           // 添加图层到地图
           this.map.add([this.satelliteLayer, this.roadNetLayer]);
-          
+
         } else {
           console.log('切换到标准图');
-          
+
           // 移除卫星图层和路网图层
-          const specialLayers = this.map.getLayers().filter(layer => 
-            layer instanceof AMap.TileLayer.Satellite || 
-            layer instanceof AMap.TileLayer.RoadNet
+          const specialLayers = this.map.getLayers().filter(layer =>
+              layer instanceof AMap.TileLayer.Satellite ||
+              layer instanceof AMap.TileLayer.RoadNet
           );
-          
+
           if (specialLayers.length > 0) {
             console.log('移除卫星图层和路网图层:', specialLayers.length);
             specialLayers.forEach(layer => this.map.remove(layer));
           }
-          
+
           // 添加或重新显示标准图层
           if (!this.normalLayer) {
             console.log('创建新的标准图层');
@@ -2820,14 +2820,14 @@ export default {
               zIndex: 5
             });
           }
-          
+
           this.map.add(this.normalLayer);
         }
-        
+
         // 确保视图不变
         this.map.setCenter(center);
         this.map.setZoom(zoom);
-        
+
       } catch (error) {
         console.error('切换地图类型时出错:', error);
         this.$message.error('切换地图类型失败，请刷新页面重试');

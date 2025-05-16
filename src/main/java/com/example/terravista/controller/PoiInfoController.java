@@ -36,7 +36,7 @@ public class PoiInfoController {
         String poiId = (String) poiInfoData.get("poiId");
         String name = (String) poiInfoData.get("name");
         logger.info("开始保存POI信息, poiId: {}, name: {}", poiId, name);
-        System.out.println(name + " 正在插入数据库");
+        System.out.println("正在插入景点POI: " + name);
 
         try {
             String description = (String) poiInfoData.get("description");
@@ -100,6 +100,7 @@ public class PoiInfoController {
             }
 
             PoiInfo savedPoiInfo = poiInfoRepository.save(poiInfo);
+            System.out.println("插入景点POI: " + name + " 成功");
 
             // 打印保存成功后的详细信息
             logger.info("POI信息保存成功:");
@@ -122,6 +123,7 @@ public class PoiInfoController {
         } catch (Exception e) {
             logger.error("保存POI信息失败, poiId: {}, name: {}, error: {}", poiId, name, e.getMessage());
             logger.error("错误详情:", e);
+            System.out.println("插入景点POI: " + name + " 失败: " + e.getMessage());
             return ResponseEntity.internalServerError().build();
         }
     }
@@ -130,10 +132,12 @@ public class PoiInfoController {
     public ResponseEntity<PoiInfo> updatePoiInfo(@PathVariable String poiId,
             @RequestBody Map<String, Object> poiInfoData) {
         logger.info("尝试更新POI信息, poiId: {}", poiId);
+        String name = (String) poiInfoData.get("name");
+        System.out.println("正在更新景点POI: " + name);
+
         PoiInfo existingPoiInfo = poiInfoRepository.findByPoiId(poiId);
         if (existingPoiInfo != null) {
             try {
-                String name = (String) poiInfoData.get("name");
                 String description = (String) poiInfoData.get("description");
                 List<String> tags = (List<String>) poiInfoData.get("tags");
                 List<String> photos = (List<String>) poiInfoData.get("photos");
@@ -163,13 +167,16 @@ public class PoiInfoController {
 
                 PoiInfo updatedPoiInfo = poiInfoRepository.save(existingPoiInfo);
                 logger.info("POI信息更新成功, poiId: {}, name: {}", poiId, name);
+                System.out.println("更新景点POI: " + name + " 成功");
                 return ResponseEntity.ok(updatedPoiInfo);
             } catch (Exception e) {
-                logger.error("更新POI信息失败, poiId: {}, error: {}", poiId, e.getMessage());
+                logger.error("更新POI信息失败, poiId: {}, name: {}, error: {}", poiId, name, e.getMessage());
+                System.out.println("更新景点POI: " + name + " 失败: " + e.getMessage());
                 return ResponseEntity.internalServerError().build();
             }
         }
         logger.info("未找到要更新的POI信息, poiId: {}", poiId);
+        System.out.println("更新景点POI: " + name + " 失败: 未找到此POI");
         return ResponseEntity.notFound().build();
     }
 

@@ -1,7 +1,42 @@
 <template>
   <div class="map-container">
-    <!-- 删除测试工具栏 -->
-
+    <!-- 测试工具栏 -->
+    <div class="test-toolbar" v-if="showTestTools">
+      <div class="test-header">
+        <h3>数据库连接测试工具</h3>
+        <el-button type="primary" size="small" @click="showTestTools = false">关闭</el-button>
+      </div>
+      <div class="test-content">
+        <div class="test-form">
+          <el-form>
+            <el-form-item label="POI ID">
+              <el-input v-model="testForm.poiId" placeholder="输入测试POI的ID"></el-input>
+            </el-form-item>
+            <el-form-item label="POI名称">
+              <el-input v-model="testForm.name" placeholder="输入测试POI的名称"></el-input>
+            </el-form-item>
+            <el-form-item label="描述">
+              <el-input v-model="testForm.description" type="textarea" placeholder="输入描述"></el-input>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="runDirectTest">直接请求</el-button>
+              <el-button type="success" @click="runProxyTest">通过代理请求</el-button>
+              <el-button type="info" @click="checkDatabase">查询数据库</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+        <div class="test-result">
+          <h4>测试结果</h4>
+          <div v-if="testResult">
+            <pre>{{ testResult }}</pre>
+          </div>
+          <div v-else class="no-result">
+            <p>尚未运行测试</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <div id="map-container"></div>
     <div class="poi-controls" v-if="map">
       <el-select
@@ -39,14 +74,12 @@
         <el-icon><Sort /></el-icon>
         绘制路线
       </el-button>
-      <!-- 添加卫星图切换按钮 -->
-      <el-switch
-          v-model="isSatelliteView"
-          active-text="卫星图"
-          inactive-text="标准图"
-          @change="toggleMapType"
-          class="map-type-switch"
-      ></el-switch>
+      <el-button type="warning" @click="testApiConnection">
+        测试API
+      </el-button>
+      <el-button type="info" @click="showTestTools = true">
+        诊断工具
+      </el-button>
     </div>
 
     <!-- 左侧景点列表抽屉 -->
@@ -84,6 +117,7 @@
                 <el-button
                     size="small"
                     @click="adjustLeftDrawerWidth(50)"
+                    :disabled="leftDrawerWidth >= 600"
                 >
                   <el-icon><Plus /></el-icon>
                 </el-button>
@@ -284,7 +318,7 @@
                         <!-- 添加官网信息显示 -->
                         <div v-if="poi.amapDetails.website" class="poi-website">
                           <el-link
-                              :href="formatWebsiteUrl(poi.amapDetails.website)"
+                              :href="poi.amapDetails.website"
                               target="_blank"
                               type="primary"
                               :underline="false"
@@ -385,67 +419,105 @@
             </div>
           </div>
         </template>
-        
-        <div v-if="selectedPois.length === 0" class="empty-message">
-          <el-empty description="暂无选中景点，请从地图上选择景点" />
-        </div>
-        
-        <div v-else class="selected-pois-list">
-          <div class="route-info">
+        <div class="selected-pois-list">
+          <div class="route-info" v-if="selectedPois.length > 0">
             <el-alert
-                title="提示：使用上下按钮调整景点顺序，点击景点可以设置起点/终点"
+                title="提示：拖拽景点可以调整顺序，点击景点可以设置起点/终点"
                 type="info"
                 :closable="false"
                 show-icon
             />
           </div>
-          
-          <!-- 使用v-for和上下移动按钮替代拖拽 -->
-          <div v-for="(poi, index) in selectedPois" :key="poi.id" class="selected-poi-item">
-            <el-card shadow="hover" class="selected-poi-card">
-              <div class="selected-poi-content">
-                <div class="move-controls">
-                  <el-button
-                    type="info"
-                    size="small"
-                    circle
-                    :disabled="index === 0"
-                    @click="movePoi(index, 'up')"
-                  >
-                    <el-icon><ArrowUp /></el-icon>
-                  </el-button>
-                  <el-button
-                    type="info"
-                    size="small"
-                    circle
-                    :disabled="index === selectedPois.length - 1"
-                    @click="movePoi(index, 'down')"
-                  >
-                    <el-icon><ArrowDown /></el-icon>
-                  </el-button>
-                </div>
-                <div class="poi-info">
-                  <h4>{{ poi.name }}</h4>
-                  <p>{{ poi.province }}</p>
+          <draggable
+              v-model="selectedPois"
+              item-key="id"
+              handle=".drag-handle"
+              @end="handleDragEnd"
+          >
+            <template #item="{ element: poi, index }">
+              <el-card shadow="hover" class="selected-poi-card">
+                <div class="selected-poi-content">
+                  <div class="drag-handle">
+                    <el-icon><Rank /></el-icon>
+                  </div>
+                  <div class="poi-info">
+                    <h4>{{ poi.name }}</h4>
+                    <p>{{ poi.province }}</p>
+                    <div v-if="poi.amapDetails" class="poi-details">
+                      <div class="poi-description-tags">
+                        <el-tag
+                            v-for="(tag, index) in getDescriptionTags(poi.amapDetails.description)"
+                            :key="'desc-' + index"
+                            type="info"
+                            effect="plain"
+                            class="description-tag"
+                        >
+                          {{ tag }}
+                        </el-tag>
+                      </div>
+                      <div v-if="poi.amapDetails.tags && poi.amapDetails.tags.length > 0" class="poi-tags">
+                        <el-tag
+                            v-for="(tag, index) in poi.amapDetails.tags"
+                            :key="'tag-' + index"
+                            :type="getTagType(tag)"
+                            effect="light"
+                            class="poi-tag"
+                        >
+                          {{ tag }}
+                        </el-tag>
+                      </div>
+                      <div v-if="poi.amapDetails.photos && poi.amapDetails.photos.length > 0 && !poi.amapDetails.photos.every(photo => photo.error)" class="poi-photos">
+                        <el-carousel
+                            :interval="4000"
+                            type="card"
+                            height="200px"
+                            indicator-position="outside"
+                            arrow="always"
+                            :autoplay="true"
+                        >
+                          <el-carousel-item v-for="(photo, photoIndex) in poi.amapDetails.photos.filter(photo => !photo.error)" :key="photoIndex">
+                            <div class="poi-photo-container">
+                              <img
+                                  :src="photo.url"
+                                  :alt="photo.title"
+                                  class="poi-photo"
+                                  @load="handleImageLoad($event, poi.id, photoIndex)"
+                                  @error="handleImageError($event, poi.id, photoIndex)"
+                                  :class="{ 'loading': !photo.loaded, 'loaded': photo.loaded }"
+                              >
+                              <div v-if="!photo.loaded" class="poi-photo loading-placeholder">
+                                <el-icon class="loading-icon"><Loading /></el-icon>
+                                <span>暂无图片...</span>
+                              </div>
+                            </div>
+                          </el-carousel-item>
+                        </el-carousel>
+                      </div>
+                      <div v-else class="poi-no-photos">
+                        <el-icon><Picture /></el-icon>
+                        <span>暂无图片</span>
+                      </div>
+                    </div>
+                  </div>
                   <div class="poi-actions">
                     <el-radio-group v-model="poi.role" size="small" @change="handleRoleChange">
-                      <el-radio-button label="start" :disabled="!canBeStart(index)">起点</el-radio-button>
-                      <el-radio-button label="end" :disabled="!canBeEnd(index)">终点</el-radio-button>
-                      <el-radio-button label="waypoint">途经点</el-radio-button>
+                      <el-radio-button :label="'start'" :disabled="!canBeStart(index)">起点</el-radio-button>
+                      <el-radio-button :label="'end'" :disabled="!canBeEnd(index)">终点</el-radio-button>
+                      <el-radio-button :label="'waypoint'">途经点</el-radio-button>
                     </el-radio-group>
                     <el-button
-                      type="danger"
-                      size="small"
-                      circle
-                      @click="removePoi(index)"
+                        type="danger"
+                        size="small"
+                        circle
+                        @click="removePoi(index)"
                     >
                       <el-icon><Delete /></el-icon>
                     </el-button>
                   </div>
                 </div>
-              </div>
-            </el-card>
-          </div>
+              </el-card>
+            </template>
+          </draggable>
 
           <!-- 当前位置选项 -->
           <el-card shadow="hover" class="current-location-card" v-if="currentLocation">
@@ -456,8 +528,8 @@
               </div>
               <div class="poi-actions">
                 <el-radio-group v-model="currentLocationRole" size="small" @change="handleCurrentLocationRoleChange">
-                  <el-radio-button label="start" :disabled="!canBeStart(-1)">设为起点</el-radio-button>
-                  <el-radio-button label="end" :disabled="!canBeEnd(-1)">设为终点</el-radio-button>
+                  <el-radio-button :label="'start'" :disabled="!canBeStart(-1)">设为起点</el-radio-button>
+                  <el-radio-button :label="'end'" :disabled="!canBeEnd(-1)">设为终点</el-radio-button>
                 </el-radio-group>
               </div>
             </div>
@@ -469,9 +541,10 @@
 </template>
 
 <script>
-import { Search, List, Delete, Close, Rank, Plus, Remove, Sort, Picture, Loading, Link, ArrowUp, ArrowDown, MapLocation } from '@element-plus/icons-vue'
+import { Search, List, Delete, Close, Rank, Plus, Remove, Sort, Picture, Loading, Link } from '@element-plus/icons-vue'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import axios from 'axios'
+import draggable from 'vuedraggable'
 
 window._AMapSecurityConfig={
   securityJsCode: process.env.VUE_APP_AMAP_SECURITY_CODE,
@@ -491,9 +564,7 @@ export default {
     Picture,
     Loading,
     Link,
-    ArrowUp,
-    ArrowDown,
-    MapLocation
+    draggable
   },
   data() {
     return {
@@ -570,12 +641,14 @@ export default {
       leftDrawerWidth: 300,
       isTagFilterCollapsed: false,
       apiTestResults: null,
-      // 添加卫星图相关数据
-      isSatelliteView: false,
-      satelliteLayer: null,
-      roadNetLayer: null,
-      normalLayer: null
-      // Removed test-related data properties
+      // 测试工具相关
+      showTestTools: false,
+      testForm: {
+        poiId: 'test-' + Date.now(),
+        name: '测试POI',
+        description: '这是一个测试POI'
+      },
+      testResult: null,
     }
   },
   mounted() {
@@ -609,9 +682,6 @@ export default {
               viewMode: '2D',
               zoom: 11
             })
-            
-            // 保存默认图层引用
-            this.normalLayer = this.map.getLayers()[0]
 
             // 添加控件
             this.map.addControl(new AMap.ToolBar())
@@ -873,9 +943,6 @@ export default {
       console.log('5A景区数量:', this.pois.filter(poi => poi.category === '5A').length);
       console.log('4A景区数量:', this.pois.filter(poi => poi.category === '4A').length);
 
-      // 保存当前地图类型状态，以便在操作后保持一致
-      const currentSatelliteState = this.isSatelliteView;
-
       const zoom = this.map.getZoom()
       // 根据缩放级别计算初始标记点大小
       let size = 40
@@ -978,12 +1045,6 @@ export default {
           this.map.add(marker);
         });
       }
-      
-      // 确保地图类型与之前一致
-      if (currentSatelliteState !== this.isSatelliteView) {
-        this.isSatelliteView = currentSatelliteState;
-        this.toggleMapType();
-      }
     },
 
     clearMarkers() {
@@ -1075,15 +1136,62 @@ export default {
 
           // 将POI信息保存到数据库
           try {
-            // 保存POI信息到数据库
+            // 打印出实际POI数据与测试数据的对比
+            const testPoiData = {
+              poiId: 'test-123',
+              name: 'Test POI',
+              description: '这是一个测试POI',
+              tags: [],
+              photos: ['https://example.com/test.jpg'],
+              website: 'https://example.com',
+              rating: 4.5,
+              price: 100,
+              openTime: '9:00-18:00',
+              facility: '停车场',
+              address: '测试地址',
+              type: '测试类型'
+            };
+            
+            // 创建一个复制的POI对象用于日志记录(避免循环引用问题)
+            const poiDataForLog = {
+              id: poi.id,
+              name: poi.name,
+              amapDetails: {
+                description: poi.amapDetails.description,
+                tags: poi.amapDetails.tags ? [...poi.amapDetails.tags] : [],
+                photos: poi.amapDetails.photos ? poi.amapDetails.photos.map(p => ({url: p.url, title: p.title})) : [],
+                website: poi.amapDetails.website,
+                rating: poi.amapDetails.rating,
+                price: poi.amapDetails.price,
+                openTime: poi.amapDetails.openTime,
+                facility: poi.amapDetails.facility,
+                address: poi.amapDetails.address,
+                type: poi.amapDetails.type
+              }
+            };
+            
+            console.log('[handleMarkerClick] 实际POI数据:', JSON.stringify(poiDataForLog));
+            console.log('[handleMarkerClick] 测试POI数据:', JSON.stringify(testPoiData));
+            console.log('[handleMarkerClick] 数据差异分析:');
+            console.log('- ID类型:', typeof poi.id);
+            console.log('- ID值:', poi.id);
+            console.log('- 描述长度:', poi.amapDetails.description ? poi.amapDetails.description.length : 0);
+            console.log('- 标签类型:', Array.isArray(poi.amapDetails.tags));
+            console.log('- 照片数组类型:', Array.isArray(poi.amapDetails.photos));
+            
+            // 检查照片数组中的对象结构
+            if (poi.amapDetails.photos && poi.amapDetails.photos.length > 0) {
+              console.log('- 照片对象示例:', JSON.stringify(poi.amapDetails.photos[0]));
+            }
+            
             const saveResult = await this.savePoiToDatabase(poi, poi.amapDetails);
             if (saveResult) {
-              console.log('已保存POI信息到数据库:', poi.name);
+              console.log('[handleMarkerClick] 已保存POI信息到数据库:', poi.name);
             } else {
-              console.error('保存POI信息到数据库失败:', poi.name);
+              console.error('[handleMarkerClick] 保存POI信息到数据库失败:', poi.name);
             }
           } catch (error) {
-            console.error('保存POI信息时出错:', error);
+            console.error('[handleMarkerClick] 保存POI信息时出错:', error);
           }
 
           console.log('更新后的POI详情:', poi.amapDetails);
@@ -1422,7 +1530,6 @@ export default {
 
           // 将POI信息保存到数据库
           try {
-            // 保存POI信息到数据库
             const saveResult = await this.savePoiToDatabase(poi, poi.amapDetails);
             if (saveResult) {
               console.log('已保存POI信息到数据库:', poi.name);
@@ -1430,7 +1537,7 @@ export default {
               console.error('保存POI信息到数据库失败:', poi.name);
             }
           } catch (error) {
-            console.error('保存POI信息时出错:', error);
+            console.error('在handleMarkerClick中保存POI信息时出错:', error);
           }
 
           console.log('Updated POI details:', poi.amapDetails);
@@ -1484,19 +1591,8 @@ export default {
       if (!this.selectedPois.find(p => p.id === id)) {
         this.selectedPois.push({
           ...poi,
-          role: 'waypoint',  // 确保设置角色
-          id: id,            // 确保有id
-          name: poi.name,    // 确保有名称
-          province: poi.province // 确保有省份
+          role: 'waypoint'
         })
-        
-        console.log('添加POI到选中列表:', {
-          id: id,
-          name: poi.name,
-          role: 'waypoint',
-          listLength: this.selectedPois.length
-        });
-        
         if (poi.category === '4A') {
           this.addPoiMarkers()
         }
@@ -1509,14 +1605,6 @@ export default {
     generateDefaultStaticMapUrl(poi) {
       const key = process.env.VUE_APP_AMAP_API_KEY;
       const markers = `mid,0xFF0000,A:${poi.longitudeGcj},${poi.latitudeGcj}`;
-
-      // 检查是否是已知有问题的坐标
-      const problematicCoordinates = '116.30783906960625,32.56169358540755';
-      if (`${poi.longitudeGcj},${poi.latitudeGcj}` === problematicCoordinates) {
-        console.log(`跳过生成已知有问题的静态地图URL: ${poi.name}`);
-        return '/map-placeholder.png'; // 使用占位图代替
-      }
-
       return `https://restapi.amap.com/v3/staticmap?location=${poi.longitudeGcj},${poi.latitudeGcj}&zoom=15&size=1024*1024&markers=${markers}&key=${key}&scale=2`;
     },
 
@@ -1739,31 +1827,9 @@ export default {
 
     // 添加新方法：显示路线
     showRoute() {
-      console.log('打开路线规划，选中景点数量:', this.selectedPois.length);
-      
-      // 确保至少有一个选中的景点
-      if (this.selectedPois.length === 0) {
-        this.$message.warning('请先选择至少一个景点');
-        return;
-      }
-      
-      // 确保每个selectedPois都有role属性
-      this.selectedPois.forEach(poi => {
-        if (!poi.role) {
-          poi.role = 'waypoint';
-        }
-      });
-      
-      // 先设置路线可见状态
-      this.isRouteVisible = true;
-      
-      // 然后打开抽屉并更新路线
-      this.rightDrawerVisible = true;
-      
-      // 延迟绘制路线以确保UI先渲染
-      setTimeout(() => {
-        this.updateRoute();
-      }, 100);
+      this.isRouteVisible = true
+      this.rightDrawerVisible = true  // 显示右侧边栏
+      this.updateRoute()
     },
 
     handleImageLoad(event, poiId, photoIndex) {
@@ -1802,45 +1868,28 @@ export default {
         error: event
       });
 
-      // u68c0u67e5u662fu5426u662fu9759u6001u5730u56fe URL
-      const isStaticMapUrl = event.target.src.includes('restapi.amap.com/v3/staticmap');
-      const isProblematicCoordinate = event.target.src.includes('116.30783906960625,32.56169358540755');
-
-      // u66f4u65b0POIu5217u8868u4e2du7684u7167u7247u72b6u6001
+      // 更新POI列表中的照片状态
       this.pois.forEach(poi => {
         if (poi.id === poiId && poi.amapDetails && poi.amapDetails.photos) {
           const photo = poi.amapDetails.photos[photoIndex];
           if (photo && photo.url === event.target.src) {
             photo.loaded = false;
             photo.error = true;
-
-            // u5982u679cu662fu95eeu9898u9759u6001u5730u56feuff0cu76f4u63a5u66ffu6362u4e3au5360u4f4du56fe
-            if (isStaticMapUrl && isProblematicCoordinate) {
-              photo.url = '/map-placeholder.png';
-              console.log(`u5c06u95eeu9898u9759u6001u5730u56feu66ffu6362u4e3au5360u4f4du56fe: ${poi.name}`);
-            } else {
-              // u5c1du8bd5u4f7fu7528u5907u7528u56feu7247
-              this.tryFallbackImage(poi, photoIndex);
-            }
+            // 尝试使用备用图片
+            this.tryFallbackImage(poi, photoIndex);
           }
         }
       });
 
-      // u66f4u65b0selectedPoisu4e2du7684u7167u7247u72b6u6001
+      // 更新selectedPois中的照片状态
       this.selectedPois.forEach(poi => {
         if (poi.id === poiId && poi.amapDetails && poi.amapDetails.photos) {
           const photo = poi.amapDetails.photos[photoIndex];
           if (photo && photo.url === event.target.src) {
             photo.loaded = false;
             photo.error = true;
-
-            // u5982u679cu662fu95eeu9898u9759u6001u5730u56feuff0cu76f4u63a5u66ffu6362u4e3au5360u4f4du56fe
-            if (isStaticMapUrl && isProblematicCoordinate) {
-              photo.url = '/map-placeholder.png';
-            } else {
-              // u5c1du8bd5u4f7fu7528u5907u7528u56feu7247
-              this.tryFallbackImage(poi, photoIndex);
-            }
+            // 尝试使用备用图片
+            this.tryFallbackImage(poi, photoIndex);
           }
         }
       });
@@ -2237,6 +2286,29 @@ export default {
 
     async fetchPoiDetails(poi) {
       try {
+        // 测试API连接
+        console.log('测试API连接');
+        try {
+          // 发送一个最简单的请求测试API连接
+          const testResponse = await axios.post('/api/poiinfo/put', {
+            poiId: 'test-' + Date.now(),
+            name: 'Test POI ' + Date.now(),
+            description: '这是一个测试POI',
+            tags: [], // 确保提供空数组而不是null
+            photos: [] // 确保提供空数组而不是null
+          });
+          console.log('API测试响应:', testResponse);
+        } catch(testError) {
+          console.error('API测试失败:', testError);
+          if (testError.response) {
+            console.error('测试错误响应:', {
+              status: testError.response.status,
+              data: testError.response.data,
+              headers: testError.response.headers
+            });
+          }
+        }
+        
         // 首先尝试从数据库获取POI信息
         console.log('尝试从数据库获取POI信息:', poi.name);
         const response = await axios.get(`/api/poiinfo/info/${poi.id}`);
@@ -2271,7 +2343,7 @@ export default {
           });
         }
       }
-
+      
       try {
         // 构建搜索关键词
         const searchKeywords = [
@@ -2393,41 +2465,12 @@ export default {
           address: details.address,
           type: details.type
         });
-
-        // 检查是否只有静态地图图片
-        const hasOnlyStaticMapImage = details.photos &&
-            details.photos.length === 1 &&
-            details.photos[0].url &&
-            details.photos[0].url.includes('restapi.amap.com/v3/staticmap');
-
-        // 检查是否使用了占位图
-        const hasPlaceholderImage = details.photos &&
-            details.photos.some(photo => photo.url === '/map-placeholder.png' ||
-                photo.url === '/map-placeholder.svg');
-
-        if (hasOnlyStaticMapImage || hasPlaceholderImage) {
-          console.log(`POI ${poi.name} 使用了静态地图或占位图，跳过保存到数据库`);
-          return false;
-        }
-
+        
         // 确保所有字段都有有效值，避免null
         const safeDescription = details.description || '';
         const safeTags = details.tags || [];
         const safePhotos = details.photos ? details.photos.map(photo => photo.url || '') : [];
-
-        // 过滤掉占位图片URL
-        const filteredPhotos = safePhotos.filter(url =>
-            url !== '/map-placeholder.png' &&
-            url !== '/map-placeholder.svg' &&
-            !url.includes('restapi.amap.com/v3/staticmap')
-        );
-
-        // 如果过滤后没有图片，跳过保存
-        if (filteredPhotos.length === 0 && safePhotos.length > 0) {
-          console.log(`POI ${poi.name} 过滤掉占位图后没有有效图片，跳过保存到数据库`);
-          return false;
-        }
-
+        
         // 确保ID是字符串类型
         let safePoiId = poi.id;
         if (typeof safePoiId !== 'string') {
@@ -2435,14 +2478,14 @@ export default {
           safePoiId = String(safePoiId); // 转换为字符串
           console.log(`已将POI ID转换为字符串: ${safePoiId}`);
         }
-
+        
         // 构建请求数据
         const poiData = {
           poiId: safePoiId,
           name: poi.name,
           description: safeDescription,
           tags: safeTags,
-          photos: filteredPhotos, // 使用过滤后的图片列表
+          photos: safePhotos,
           website: details.website || null,
           rating: details.rating || null,
           price: details.price || null,
@@ -2451,18 +2494,59 @@ export default {
           address: details.address || null,
           type: details.type || null
         };
-
+        
         console.log('发送到后端的POI数据:', JSON.stringify(poiData));
-
-        // 使用标准方式通过代理发送请求
+        
+        // 检查网络连接：先尝试直接发送请求到后端，绕过代理
+        try {
+          console.log('*** 测试直接请求后端 ***');
+          const directTestData = {
+            poiId: 'direct-test-' + Date.now(),
+            name: 'Direct Test POI',
+            description: '绕过代理的测试POI',
+            tags: ['测试'],
+            photos: ['https://example.com/test.jpg']
+          };
+          
+          // 注意：这里直接请求后端地址，绕过Vue代理
+          const directResponse = await fetch('http://localhost:9090/poiinfo/put', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(directTestData)
+          });
+          
+          const directResult = await directResponse.json();
+          console.log('直接请求响应:', directResult);
+          console.log('直接请求状态:', directResponse.status, directResponse.statusText);
+        } catch (directError) {
+          console.error('直接请求失败:', directError);
+        }
+        
+        // 使用标准方式通过代理发送
+        console.log('*** 通过代理发送请求 ***');
         const response = await axios.post('/api/poiinfo/put', poiData);
 
         console.log(`保存POI信息响应结果:`, response);
         console.log(`响应状态码:`, response.status);
         console.log(`响应数据:`, JSON.stringify(response.data));
+        console.log(`响应头:`, response.headers);
 
         if (response.data) {
           console.log(`POI ${poi.name} 的信息已成功保存到数据库, 数据ID: ${response.data.id}`);
+          // 验证数据是否真的保存了 - 立即尝试获取
+          try {
+            console.log('立即验证数据是否保存 - 尝试获取刚保存的POI信息');
+            const verifyResponse = await axios.get(`/api/poiinfo/info/${safePoiId}`);
+            if (verifyResponse.data) {
+              console.log('验证成功 - 数据已存在于数据库中:', verifyResponse.data);
+            } else {
+              console.error('验证失败 - 虽然保存请求成功，但数据不存在于数据库中');
+            }
+          } catch (verifyError) {
+            console.error('验证请求失败:', verifyError);
+          }
           return true;
         } else {
           console.error(`POI ${poi.name} 的信息保存失败: 服务器返回空数据`);
@@ -2491,7 +2575,7 @@ export default {
 
     // 修改更新标记图标的方法
     updateMarkerIcon(marker, isActive) {
-      console.log('Updating marker icon:', {isActive, markerId: marker._poiId})
+      console.log('Updating marker icon:', { isActive, markerId: marker._poiId })
       const size = marker._size || 40
       const imagePath = isActive ? '/spoj.png' : '/pos.png'
       console.log('Using image path:', imagePath)
@@ -2693,7 +2777,7 @@ export default {
 
     adjustLeftDrawerWidth(delta) {
       const newWidth = this.leftDrawerWidth + delta;
-      if (newWidth >= 200) {
+      if (newWidth >= 200 && newWidth <= 600) {
         this.leftDrawerWidth = newWidth;
       }
     },
@@ -2711,126 +2795,155 @@ export default {
       return baseHeight;
     },
 
-    // 添加新方法：格式化网站URL，确保包含协议前缀
-    formatWebsiteUrl(url) {
-      if (!url) return '#';
-      // 检查URL是否已经包含http://或https://前缀
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        return url;
-      }
-      // 如果没有前缀，添加http://
-      return 'http://' + url;
-    },
-
-    // 添加移动POI的方法
-    movePoi(index, direction) {
-      // 处理边界情况
-      if (direction === 'up' && index === 0) return;
-      if (direction === 'down' && index === this.selectedPois.length - 1) return;
-      
-      const newIndex = direction === 'up' ? index - 1 : index + 1;
-      
-      // 创建一个新数组
-      const newPois = [...this.selectedPois];
-      
-      // 交换位置
-      const temp = newPois[index];
-      newPois[index] = newPois[newIndex];
-      newPois[newIndex] = temp;
-      
-      // 更新数组
-      this.selectedPois = newPois;
-      
-      // 如果路线可见，则更新路线
-      if (this.isRouteVisible) {
-        this.updateRoute();
-      }
-      
-      console.log('已移动POI顺序:', {
-        direction: direction,
-        movedPoi: this.selectedPois[newIndex].name,
-        fromIndex: index,
-        toIndex: newIndex
-      });
-    },
-
-    // 切换地图类型（标准图/卫星图）
-    toggleMapType() {
-      if (!this.map) return;
-      
+    // 添加API测试方法
+    async testApiConnection() {
       try {
-        // 先获取当前地图的中心点和缩放级别，以便切换后保持视图
-        const center = this.map.getCenter();
-        const zoom = this.map.getZoom();
+        console.log('开始测试API连接...');
+        // 创建测试数据
+        const testData = {
+          poiId: 'test-' + Date.now(),
+          name: 'Test POI ' + Date.now(),
+          description: '这是一个测试POI',
+          tags: ['测试标签1', '测试标签2'],
+          photos: ['https://example.com/test.jpg'],
+          website: 'https://example.com',
+          rating: 4.5,
+          price: 100,
+          openTime: '9:00-18:00',
+          facility: '停车场',
+          address: '测试地址',
+          type: '测试类型'
+        };
         
-        if (this.isSatelliteView) {
-          console.log('切换到卫星图');
-          
-          // 确保移除所有标准图层
-          const baseLayers = this.map.getLayers().filter(layer => 
-            layer instanceof AMap.TileLayer && 
-            !(layer instanceof AMap.TileLayer.Satellite) && 
-            !(layer instanceof AMap.TileLayer.RoadNet)
-          );
-          
-          if (baseLayers.length > 0) {
-            console.log('移除标准图层:', baseLayers.length);
-            baseLayers.forEach(layer => this.map.remove(layer));
-          }
-          
-          // 添加卫星图层
-          if (!this.satelliteLayer) {
-            console.log('创建新的卫星图层');
-            this.satelliteLayer = new AMap.TileLayer.Satellite({
-              zIndex: 5, // 确保在底图层
-              opacity: 1
-            });
-          }
-          
-          // 添加路网图层提高可读性
-          if (!this.roadNetLayer) {
-            console.log('创建新的路网图层');
-            this.roadNetLayer = new AMap.TileLayer.RoadNet({
-              zIndex: 10, // 确保在卫星图层之上
-              opacity: 0.8
-            });
-          }
-          
-          // 添加图层到地图
-          this.map.add([this.satelliteLayer, this.roadNetLayer]);
-          
+        // 直接发送请求到后端
+        console.log('发送测试请求：', testData);
+        const response = await axios.post('/api/poiinfo/put', testData);
+        
+        console.log('测试成功！服务器响应：', response);
+        this.$notify({
+          title: '测试成功',
+          message: `API连接正常，POI信息已保存，ID: ${response.data.id}`,
+          type: 'success',
+          duration: 5000
+        });
+      } catch (error) {
+        console.error('API测试失败：', error);
+        let errorMessage = '未知错误';
+        
+        if (error.response) {
+          errorMessage = `状态码: ${error.response.status}, 错误信息: ${JSON.stringify(error.response.data)}`;
+          console.error('错误响应:', {
+            status: error.response.status,
+            data: error.response.data,
+            headers: error.response.headers
+          });
+        } else if (error.request) {
+          errorMessage = '服务器未响应请求';
+          console.error('无响应:', error.request);
         } else {
-          console.log('切换到标准图');
-          
-          // 移除卫星图层和路网图层
-          const specialLayers = this.map.getLayers().filter(layer => 
-            layer instanceof AMap.TileLayer.Satellite || 
-            layer instanceof AMap.TileLayer.RoadNet
-          );
-          
-          if (specialLayers.length > 0) {
-            console.log('移除卫星图层和路网图层:', specialLayers.length);
-            specialLayers.forEach(layer => this.map.remove(layer));
-          }
-          
-          // 添加或重新显示标准图层
-          if (!this.normalLayer) {
-            console.log('创建新的标准图层');
-            this.normalLayer = new AMap.TileLayer({
-              zIndex: 5
-            });
-          }
-          
-          this.map.add(this.normalLayer);
+          errorMessage = error.message;
+          console.error('请求错误:', error.message);
         }
         
-        // 确保视图不变
-        this.map.setCenter(center);
-        this.map.setZoom(zoom);
+        this.$notify({
+          title: 'API测试失败',
+          message: errorMessage,
+          type: 'error',
+          duration: 5000
+        });
+      }
+    },
+
+    // 添加测试方法
+    async runDirectTest() {
+      this.testResult = '正在进行直接请求测试...\n';
+      try {
+        const testData = {
+          poiId: this.testForm.poiId,
+          name: this.testForm.name,
+          description: this.testForm.description,
+          tags: ['测试标签'],
+          photos: ['https://example.com/test.jpg']
+        };
         
+        this.testResult += `发送数据: ${JSON.stringify(testData, null, 2)}\n`;
+        
+        // 直接请求后端
+        const response = await fetch('http://localhost:9090/poiinfo/put', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(testData)
+        });
+        
+        const responseData = await response.json();
+        
+        this.testResult += `响应状态: ${response.status} ${response.statusText}\n`;
+        this.testResult += `响应数据: ${JSON.stringify(responseData, null, 2)}\n`;
+        
+        if (response.ok) {
+          this.testResult += '直接请求测试成功!\n';
+        } else {
+          this.testResult += '直接请求测试失败!\n';
+        }
       } catch (error) {
-        console.error('切换地图类型时出错:', error);
-        this.$message.error('切换地图类型失败，请刷新页面重试');
+        this.testResult += `测试出错: ${error.message}\n`;
+        console.error('直接请求测试失败:', error);
+      }
+    },
+    
+    async runProxyTest() {
+      this.testResult = '正在进行代理请求测试...\n';
+      try {
+        const testData = {
+          poiId: this.testForm.poiId,
+          name: this.testForm.name,
+          description: this.testForm.description,
+          tags: ['测试标签'],
+          photos: ['https://example.com/test.jpg']
+        };
+        
+        this.testResult += `发送数据: ${JSON.stringify(testData, null, 2)}\n`;
+        
+        // 通过Vue代理请求
+        const response = await axios.post('/api/poiinfo/put', testData);
+        
+        this.testResult += `响应状态: ${response.status} ${response.statusText}\n`;
+        this.testResult += `响应数据: ${JSON.stringify(response.data, null, 2)}\n`;
+        
+        this.testResult += '代理请求测试成功!\n';
+      } catch (error) {
+        this.testResult += `测试出错: ${error.message}\n`;
+        if (error.response) {
+          this.testResult += `响应状态: ${error.response.status}\n`;
+          this.testResult += `响应数据: ${JSON.stringify(error.response.data, null, 2)}\n`;
+        }
+        console.error('代理请求测试失败:', error);
+      }
+    },
+    
+    async checkDatabase() {
+      this.testResult = '正在查询数据库...\n';
+      try {
+        // 查询数据库中是否存在测试数据
+        const response = await axios.get(`/api/poiinfo/info/${this.testForm.poiId}`);
+        
+        if (response.data) {
+          this.testResult += `数据存在于数据库中:\n${JSON.stringify(response.data, null, 2)}\n`;
+        } else {
+          this.testResult += '数据不存在于数据库中\n';
+        }
+      } catch (error) {
+        this.testResult += `查询出错: ${error.message}\n`;
+        if (error.response && error.response.status === 404) {
+          this.testResult += '数据不存在于数据库中\n';
+        } else if (error.response) {
+          this.testResult += `响应状态: ${error.response.status}\n`;
+          this.testResult += `响应数据: ${JSON.stringify(error.response.data, null, 2)}\n`;
+        }
+        console.error('数据库查询失败:', error);
       }
     },
   }
@@ -2861,7 +2974,7 @@ export default {
   background: white;
   padding: 10px;
   border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
   display: flex;
   gap: 10px;
   align-items: center;
@@ -2935,7 +3048,7 @@ export default {
   z-index: 1001 !important;
   pointer-events: auto;
   background-color: #fff;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
 }
 
 :deep(.el-drawer__header) {
@@ -2981,13 +3094,13 @@ export default {
 /* 右侧抽屉遮罩层样式 */
 :deep(.right-drawer .el-drawer__mask) {
   right: 0;
-  width: v-bind(rightDrawerWidth+ 'px') !important;
+  width: v-bind(rightDrawerWidth + 'px') !important;
 }
 
 /* 左侧抽屉遮罩层样式 */
 :deep(.left-drawer-wrapper .el-drawer__mask) {
   left: 0;
-  width: v-bind(leftDrawerWidth+ 'px') !important;
+  width: v-bind(leftDrawerWidth + 'px') !important;
 }
 
 .poi-details {
@@ -3431,7 +3544,7 @@ export default {
 /* 修改左侧抽屉遮罩层样式 */
 :deep(.left-drawer-wrapper .el-drawer__mask) {
   left: 0;
-  width: v-bind(leftDrawerWidth+ 'px') !important;
+  width: v-bind(leftDrawerWidth + 'px') !important;
 }
 
 /* 优化标签筛选区域样式 */
@@ -3641,118 +3754,59 @@ export default {
   font-size: 14px;
 }
 
-/* 添加右侧抽屉中的选中景点卡片样式 */
-.selected-poi-card {
-  margin-bottom: 10px;
-  transition: all 0.3s ease;
-}
-
-.selected-poi-content {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.drag-handle {
-  cursor: move;
-  color: #909399;
-  padding: 5px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #f5f7fa;
+/* 测试工具栏样式 */
+.test-toolbar {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 2001;
+  background: white;
+  padding: 10px;
   border-radius: 4px;
-  margin-right: 10px;
-}
-
-.drag-handle:hover {
-  background-color: #e4e7ed;
-  color: #606266;
-}
-
-/* 拖拽时的样式 */
-.ghost-item {
-  opacity: 0.5;
-  background: #f0f9eb;
-  border: 1px dashed #67c23a;
-}
-
-.chosen-item {
-  background: #f0f9eb;
-}
-
-.selected-poi-content {
-  display: flex;
-  align-items: center;
-}
-
-.poi-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 10px;
-  gap: 10px;
-}
-
-.current-location-card {
-  margin-top: 15px;
-  border-top: 2px dashed #e6e6e6;
-  padding-top: 15px;
-}
-
-.selected-pois-list {
-  padding: 15px;
-}
-
-.route-info {
-  margin-bottom: 15px;
-}
-
-.selected-poi-item {
-  margin-bottom: 10px;
-}
-
-.empty-message {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-}
-
-.move-controls {
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-right: 10px;
-}
-
-.selected-poi-content {
-  display: flex;
+  gap: 10px;
   align-items: center;
+  pointer-events: auto;
 }
 
-.poi-info {
-  flex: 1;
-}
-
-/* 添加卫星图切换开关样式 */
-.map-type-switch {
-  margin-left: 10px;
+.test-header {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.8);
-  padding: 5px 10px;
+  width: 100%;
+}
+
+.test-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.test-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.test-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.no-result {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100px;
+  background-color: #f5f7fa;
   border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-}
-
-:deep(.map-type-switch .el-switch__label) {
+  color: #909399;
   font-size: 14px;
-  font-weight: bold;
-  color: #606266;
-}
-
-:deep(.map-type-switch .el-switch__label.is-active) {
-  color: #409EFF;
 }
 </style>

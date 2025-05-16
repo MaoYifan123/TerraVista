@@ -11,6 +11,6 @@ import java.util.List;
 public interface PoiInfoRepository extends JpaRepository<PoiInfo, Long> {
     PoiInfo findByPoiId(String poiId);
 
-    @Query("SELECT DISTINCT t FROM PoiInfo p JOIN p.tags t")
+    @Query(value = "SELECT DISTINCT json_unquote(json_extract(tags, '$[*]')) FROM poi_info WHERE tags IS NOT NULL", nativeQuery = true)
     List<String> findAllTags();
 }
