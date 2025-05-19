@@ -385,11 +385,11 @@
             </div>
           </div>
         </template>
-
+        
         <div v-if="selectedPois.length === 0" class="empty-message">
           <el-empty description="暂无选中景点，请从地图上选择景点" />
         </div>
-
+        
         <div v-else class="selected-pois-list">
           <div class="route-info">
             <el-alert
@@ -399,27 +399,27 @@
                 show-icon
             />
           </div>
-
+          
           <!-- 使用v-for和上下移动按钮替代拖拽 -->
           <div v-for="(poi, index) in selectedPois" :key="poi.id" class="selected-poi-item">
             <el-card shadow="hover" class="selected-poi-card">
               <div class="selected-poi-content">
                 <div class="move-controls">
                   <el-button
-                      type="info"
-                      size="small"
-                      circle
-                      :disabled="index === 0"
-                      @click="movePoi(index, 'up')"
+                    type="info"
+                    size="small"
+                    circle
+                    :disabled="index === 0"
+                    @click="movePoi(index, 'up')"
                   >
                     <el-icon><ArrowUp /></el-icon>
                   </el-button>
                   <el-button
-                      type="info"
-                      size="small"
-                      circle
-                      :disabled="index === selectedPois.length - 1"
-                      @click="movePoi(index, 'down')"
+                    type="info"
+                    size="small"
+                    circle
+                    :disabled="index === selectedPois.length - 1"
+                    @click="movePoi(index, 'down')"
                   >
                     <el-icon><ArrowDown /></el-icon>
                   </el-button>
@@ -434,10 +434,10 @@
                       <el-radio-button label="waypoint">途经点</el-radio-button>
                     </el-radio-group>
                     <el-button
-                        type="danger"
-                        size="small"
-                        circle
-                        @click="removePoi(index)"
+                      type="danger"
+                      size="small"
+                      circle
+                      @click="removePoi(index)"
                     >
                       <el-icon><Delete /></el-icon>
                     </el-button>
@@ -609,7 +609,7 @@ export default {
               viewMode: '2D',
               zoom: 11
             })
-
+            
             // 保存默认图层引用
             this.normalLayer = this.map.getLayers()[0]
 
@@ -978,7 +978,7 @@ export default {
           this.map.add(marker);
         });
       }
-
+      
       // 确保地图类型与之前一致
       if (currentSatelliteState !== this.isSatelliteView) {
         this.isSatelliteView = currentSatelliteState;
@@ -1473,10 +1473,93 @@ export default {
         }
       }
 
+      // 更新信息窗口内容，使用与POI卡片相同的模板
+      const infoWindowContent = `
+        <div class="poi-info-window">
+          <div class="poi-item-content">
+            ${poi.amapDetails.photos && poi.amapDetails.photos.length > 0 ? `
+              <div class="poi-photos">
+                <div class="poi-photo-container">
+                  <img src="${poi.amapDetails.photos[0].url}" 
+                       alt="${poi.name}" 
+                       class="poi-photo"
+                       onerror="this.src='/map-placeholder.png'">
+                </div>
+              </div>
+            ` : `
+              <div class="poi-no-photos">
+                <i class="el-icon-picture"></i>
+                <span>暂无图片</span>
+              </div>
+            `}
+            <div class="poi-info">
+              <h3>${poi.name}</h3>
+              <p>省份：${poi.province}</p>
+              <p>类别：${poi.category}</p>
+              <div class="poi-details">
+                ${poi.amapDetails.description ? `
+                  <div class="poi-description-tags">
+                    ${this.getDescriptionTags(poi.amapDetails.description).map(tag => 
+                      `<span class="description-tag">${tag}</span>`
+                    ).join('')}
+                  </div>
+                ` : ''}
+                ${poi.amapDetails.tags && poi.amapDetails.tags.length > 0 ? `
+                  <div class="poi-tags">
+                    ${poi.amapDetails.tags.map(tag => 
+                      `<span class="poi-tag" style="background-color: ${this.getTagType(tag) === 'primary' ? '#409EFF' : 
+                        this.getTagType(tag) === 'success' ? '#67C23A' : 
+                        this.getTagType(tag) === 'warning' ? '#E6A23C' : 
+                        this.getTagType(tag) === 'danger' ? '#F56C6C' : '#909399'}; 
+                        color: white; 
+                        padding: 2px 8px; 
+                        border-radius: 4px; 
+                        margin: 2px; 
+                        font-size: 12px;">${tag}</span>`
+                    ).join('')}
+                  </div>
+                ` : ''}
+                ${poi.amapDetails.website ? `
+                  <div class="poi-website">
+                    <a href="${this.formatWebsiteUrl(poi.amapDetails.website)}" 
+                       target="_blank" 
+                       style="color: #409EFF; text-decoration: none; display: inline-flex; align-items: center; gap: 5px;">
+                      <i class="el-icon-link"></i>
+                      <span>访问网站</span>
+                    </a>
+                  </div>
+                ` : `
+                  <div class="poi-no-website">
+                    <span style="display: inline-flex; align-items: center; gap: 5px; color: #909399; font-size: 12px;">
+                      <i class="el-icon-link"></i>
+                      <span>暂无网站</span>
+                    </span>
+                  </div>
+                `}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 更新信息窗口实例
+      if (!this.infoWindowInstances[id]) {
+        this.infoWindowInstances[id] = new AMap.InfoWindow({
+          content: infoWindowContent,
+          offset: new AMap.Pixel(0, -30),
+          autoMove: false,
+          closeWhenClickMap: false,
+          isCustom: true,
+          anchor: 'bottom-center'
+        });
+      } else {
+        this.infoWindowInstances[id].setContent(infoWindowContent);
+      }
+
       // Open info window
       console.log('Opening marker:', id)
-      infoWindow.open(this.map, marker.getPosition())
-      this.openInfoWindows[id] = infoWindow
+      this.infoWindowInstances[id].open(this.map, marker.getPosition())
+      this.openInfoWindows[id] = this.infoWindowInstances[id]
       this.activeMarkers.add(id)
       this.updateMarkerIcon(marker, true)
 
@@ -1484,19 +1567,19 @@ export default {
       if (!this.selectedPois.find(p => p.id === id)) {
         this.selectedPois.push({
           ...poi,
-          role: 'waypoint',  // 确保设置角色
-          id: id,            // 确保有id
-          name: poi.name,    // 确保有名称
-          province: poi.province // 确保有省份
+          role: 'waypoint',
+          id: id,
+          name: poi.name,
+          province: poi.province
         })
-
+        
         console.log('添加POI到选中列表:', {
           id: id,
           name: poi.name,
           role: 'waypoint',
           listLength: this.selectedPois.length
         });
-
+        
         if (poi.category === '4A') {
           this.addPoiMarkers()
         }
@@ -1740,26 +1823,26 @@ export default {
     // 添加新方法：显示路线
     showRoute() {
       console.log('打开路线规划，选中景点数量:', this.selectedPois.length);
-
+      
       // 确保至少有一个选中的景点
       if (this.selectedPois.length === 0) {
         this.$message.warning('请先选择至少一个景点');
         return;
       }
-
+      
       // 确保每个selectedPois都有role属性
       this.selectedPois.forEach(poi => {
         if (!poi.role) {
           poi.role = 'waypoint';
         }
       });
-
+      
       // 先设置路线可见状态
       this.isRouteVisible = true;
-
+      
       // 然后打开抽屉并更新路线
       this.rightDrawerVisible = true;
-
+      
       // 延迟绘制路线以确保UI先渲染
       setTimeout(() => {
         this.updateRoute();
@@ -2727,25 +2810,25 @@ export default {
       // 处理边界情况
       if (direction === 'up' && index === 0) return;
       if (direction === 'down' && index === this.selectedPois.length - 1) return;
-
+      
       const newIndex = direction === 'up' ? index - 1 : index + 1;
-
+      
       // 创建一个新数组
       const newPois = [...this.selectedPois];
-
+      
       // 交换位置
       const temp = newPois[index];
       newPois[index] = newPois[newIndex];
       newPois[newIndex] = temp;
-
+      
       // 更新数组
       this.selectedPois = newPois;
-
+      
       // 如果路线可见，则更新路线
       if (this.isRouteVisible) {
         this.updateRoute();
       }
-
+      
       console.log('已移动POI顺序:', {
         direction: direction,
         movedPoi: this.selectedPois[newIndex].name,
@@ -2757,27 +2840,27 @@ export default {
     // 切换地图类型（标准图/卫星图）
     toggleMapType() {
       if (!this.map) return;
-
+      
       try {
         // 先获取当前地图的中心点和缩放级别，以便切换后保持视图
         const center = this.map.getCenter();
         const zoom = this.map.getZoom();
-
+        
         if (this.isSatelliteView) {
           console.log('切换到卫星图');
-
+          
           // 确保移除所有标准图层
-          const baseLayers = this.map.getLayers().filter(layer =>
-              layer instanceof AMap.TileLayer &&
-              !(layer instanceof AMap.TileLayer.Satellite) &&
-              !(layer instanceof AMap.TileLayer.RoadNet)
+          const baseLayers = this.map.getLayers().filter(layer => 
+            layer instanceof AMap.TileLayer && 
+            !(layer instanceof AMap.TileLayer.Satellite) && 
+            !(layer instanceof AMap.TileLayer.RoadNet)
           );
-
+          
           if (baseLayers.length > 0) {
             console.log('移除标准图层:', baseLayers.length);
             baseLayers.forEach(layer => this.map.remove(layer));
           }
-
+          
           // 添加卫星图层
           if (!this.satelliteLayer) {
             console.log('创建新的卫星图层');
@@ -2786,7 +2869,7 @@ export default {
               opacity: 1
             });
           }
-
+          
           // 添加路网图层提高可读性
           if (!this.roadNetLayer) {
             console.log('创建新的路网图层');
@@ -2795,24 +2878,24 @@ export default {
               opacity: 0.8
             });
           }
-
+          
           // 添加图层到地图
           this.map.add([this.satelliteLayer, this.roadNetLayer]);
-
+          
         } else {
           console.log('切换到标准图');
-
+          
           // 移除卫星图层和路网图层
-          const specialLayers = this.map.getLayers().filter(layer =>
-              layer instanceof AMap.TileLayer.Satellite ||
-              layer instanceof AMap.TileLayer.RoadNet
+          const specialLayers = this.map.getLayers().filter(layer => 
+            layer instanceof AMap.TileLayer.Satellite || 
+            layer instanceof AMap.TileLayer.RoadNet
           );
-
+          
           if (specialLayers.length > 0) {
             console.log('移除卫星图层和路网图层:', specialLayers.length);
             specialLayers.forEach(layer => this.map.remove(layer));
           }
-
+          
           // 添加或重新显示标准图层
           if (!this.normalLayer) {
             console.log('创建新的标准图层');
@@ -2820,14 +2903,14 @@ export default {
               zIndex: 5
             });
           }
-
+          
           this.map.add(this.normalLayer);
         }
-
+        
         // 确保视图不变
         this.map.setCenter(center);
         this.map.setZoom(zoom);
-
+        
       } catch (error) {
         console.error('切换地图类型时出错:', error);
         this.$message.error('切换地图类型失败，请刷新页面重试');
@@ -3754,5 +3837,101 @@ export default {
 
 :deep(.map-type-switch .el-switch__label.is-active) {
   color: #409EFF;
+}
+
+/* 添加信息窗口样式 */
+:deep(.poi-info-window) {
+  padding: 15px;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+:deep(.poi-info-window .poi-item-content) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+:deep(.poi-info-window .poi-photos) {
+  width: 100%;
+  height: 200px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:deep(.poi-info-window .poi-photo-container) {
+  width: 100%;
+  height: 100%;
+}
+
+:deep(.poi-info-window .poi-photo) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+:deep(.poi-info-window .poi-info) {
+  flex: 1;
+}
+
+:deep(.poi-info-window .poi-info h3) {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #303133;
+}
+
+:deep(.poi-info-window .poi-info p) {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+:deep(.poi-info-window .poi-description-tags) {
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+:deep(.poi-info-window .description-tag) {
+  font-size: 12px;
+  padding: 2px 8px;
+  background-color: #f0f2f5;
+  color: #606266;
+  border-radius: 4px;
+}
+
+:deep(.poi-info-window .poi-tags) {
+  margin: 8px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+:deep(.poi-info-window .poi-website) {
+  margin-top: 8px;
+}
+
+:deep(.poi-info-window .poi-no-website) {
+  margin-top: 8px;
+  color: #909399;
+  font-size: 12px;
+}
+
+:deep(.poi-info-window .poi-no-photos) {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  color: #909399;
+  font-size: 14px;
+}
+
+:deep(.poi-info-window .poi-no-photos i) {
+  font-size: 24px;
+  margin-bottom: 8px;
 }
 </style>

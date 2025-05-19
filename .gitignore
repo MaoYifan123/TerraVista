@@ -31,5 +31,5 @@ build/
 
 ### VS Code ###
 .vscode/
-/UI/node_modules/
-/UI/package-lock.json
+/Client/node_modules/
+/Client/package-lock.json

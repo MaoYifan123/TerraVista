@@ -1,0 +1,74 @@
+import { defineStore } from 'pinia'
+import axios from 'axios'
+
+export const useUserStore = defineStore('user', {
+  state: () => ({
+    user: null,
+    token: localStorage.getItem('token') || null
+  }),
+
+  getters: {
+    isLoggedIn: (state) => !!state.token,
+    userRole: (state) => state.user?.role,
+    isAdmin: (state) => state.user?.role === 'ADMIN'
+  },
+
+  actions: {
+    async login(username, password) {
+      try {
+        const response = await axios.post('/api/user/login', {  // 修改为正确的登录接口路径
+          username,
+          password
+        })
+        this.token = response.data.token
+        localStorage.setItem('token', this.token)
+        axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`
+        // 获取用户信息
+        await this.fetchUserInfo()
+        return true
+      } catch (error) {
+        console.error('Login failed:', error)
+        return false
+      }
+    },
+
+    async fetchUserInfo() {
+      try {
+        const response = await axios.get('/api/user/profile')
+        this.user = response.data
+        return true
+      } catch (error) {
+        console.error('Failed to fetch user info:', error)
+        this.logout()
+        return false
+      }
+    },
+
+    logout() {
+      this.user = null
+      this.token = null
+      localStorage.removeItem('token')
+      delete axios.defaults.headers.common['Authorization']
+    },
+
+    async register(userData) {
+      try {
+        const response = await axios.post('/api/user/register', userData)
+        this.token = response.data.token
+        this.user = response.data.user
+        localStorage.setItem('token', this.token)
+        // 设置axios默认请求头
+        axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`
+        return true
+      } catch (error) {
+        console.error('Registration failed:', error)
+        return false
+      }
+    },
+
+    // 检查是否是管理员
+    checkIsAdmin() {
+      return this.user?.role === 'ADMIN'
+    }
+  }
+}) 
