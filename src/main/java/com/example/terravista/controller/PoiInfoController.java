@@ -7,6 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpStatus;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 
 import java.util.List;
 import java.util.Map;
@@ -20,6 +23,7 @@ public class PoiInfoController {
     private PoiInfoRepository poiInfoRepository;
 
     @GetMapping("/info/{poiId}")
+    @RateLimiter(name = "poiInfoRateLimiter", fallbackMethod = "rateLimitFallback")
     public ResponseEntity<PoiInfo> getPoiInfo(@PathVariable String poiId) {
         logger.info("尝试获取POI信息, poiId: {}", poiId);
         PoiInfo poiInfo = poiInfoRepository.findByPoiId(poiId);
@@ -29,6 +33,11 @@ public class PoiInfoController {
         }
         logger.info("数据库中未找到POI信息, poiId: {}", poiId);
         return ResponseEntity.notFound().build();
+    }
+
+    // Fallback handler for rate limit exceeded
+    public ResponseEntity<PoiInfo> rateLimitFallback(String poiId, RequestNotPermitted ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build();
     }
 
     @PostMapping("/put")

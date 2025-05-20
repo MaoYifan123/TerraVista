@@ -1,17 +1,18 @@
 package com.example.terravista.security;
 
-import org.junit.jupiter.api.Order;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import javax.security.sasl.AuthenticationException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -25,8 +26,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, String>> handleAuthenticationException(AuthenticationException e) {
+        String message = "认证失败";
+        if (e instanceof BadCredentialsException) {
+            message = "用户名或密码错误";
+        }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                Collections.singletonMap("error", "Authentication failed")
+                Collections.singletonMap("error", message)
         );
     }
 
@@ -39,5 +44,11 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
         return ResponseEntity.badRequest().body(errors);
+    }
+
+    @ExceptionHandler(RequestNotPermitted.class)
+    public ResponseEntity<Map<String, String>> handleRequestNotPermitted(RequestNotPermitted e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Collections.singletonMap("error", "请求过于频繁，请稍后再试"));
     }
 }

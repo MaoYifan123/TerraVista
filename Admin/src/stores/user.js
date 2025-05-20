@@ -16,7 +16,7 @@ export const useUserStore = defineStore('user', {
   actions: {
     async login(username, password) {
       try {
-        const response = await axios.post('/api/user/login', {  // 修改为正确的登录接口路径
+        const response = await axios.post('/api/user/login', {
           username,
           password
         })
@@ -25,10 +25,17 @@ export const useUserStore = defineStore('user', {
         axios.defaults.headers.common['Authorization'] = `Bearer ${this.token}`
         // 获取用户信息
         await this.fetchUserInfo()
-        return true
+        return { success: true }
       } catch (error) {
         console.error('Login failed:', error)
-        return false
+        if (error.response) {
+          if (error.response.status === 429) {
+            return { success: false, error: error.response.data.error || '请求过于频繁，请稍后再试' }
+          } else if (error.response.status === 401) {
+            return { success: false, error: '用户名或密码错误' }
+          }
+        }
+        return { success: false, error: '登录失败，请重试' }
       }
     },
 
