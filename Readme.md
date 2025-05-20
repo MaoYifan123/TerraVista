@@ -1,6 +1,6 @@
 # TerraVista
 
-TerraVista是一个基于Spring Boot和Vue.js的现代化Web应用程序。
+TerraVista是一个基于Spring Boot和Vue.js的现代化Web应用程序，以实现POI可视化方便用户制作旅游计划。
 
 ## 项目架构
 
