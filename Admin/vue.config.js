@@ -17,9 +17,8 @@ module.exports = defineConfig({
   configureWebpack: {
     plugins: [
       new webpack.DefinePlugin({
-        // 'process.env.VITE_DEEPSEEK_API_KEY': JSON.stringify(process.env.VITE_DEEPSEEK_API_KEY),
-        'process.env.VUE_APP_AMAP_API_KEY': JSON.stringify('a3938a5dec28bdc4b32572020e490ca5'),
-        'process.env.VUE_APP_AMAP_SECURITY_CODE': JSON.stringify('3878297dc74c26e970e93979aca2c18a'),
+        'process.env.VUE_APP_AMAP_API_KEY': JSON.stringify('<your-Gaode-Web JS-api-key>'),
+        'process.env.VUE_APP_AMAP_SECURITY_CODE': JSON.stringify('<your-Gaode-Web JS-security-api-key>'),
       }),
     ],
   },
@@ -40,6 +39,15 @@ module.exports = defineConfig({
     },
     client: {
       overlay: false
+    }
+  },
+  pwa:{
+    iconPaths: {
+      favicon32: 'favicon.ico',
+      favicon16: 'favicon.ico',
+      appleTouchIcon: 'favicon.ico',
+      maskIcon: 'favicon.ico',
+      msTileImage: 'favicon.ico'
     }
   }
 })

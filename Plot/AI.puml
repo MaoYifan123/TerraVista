@@ -1,0 +1,54 @@
+@startuml AI Recommendation Interface
+
+skinparam backgroundColor white
+skinparam sequence {
+    ArrowColor #409EFF
+    ActorBorderColor #409EFF
+    LifeLineBorderColor #409EFF
+    ParticipantBorderColor #409EFF
+    ParticipantBackgroundColor #F5F7FA
+}
+
+actor User
+participant "AIRecommend.vue" as AI
+participant "LocalStorage" as Storage
+participant "Backend API" as API
+
+== 初始化 ==
+User -> AI: 访问AI推荐页面
+activate AI
+AI -> Storage: 加载历史对话记录
+Storage --> AI: 返回历史记录
+AI -> AI: 初始化界面
+deactivate AI
+
+== 发送消息 ==
+User -> AI: 选择标签\n(地点/类型/月份)
+User -> AI: 输入问题
+User -> AI: 点击发送按钮
+activate AI
+AI -> AI: 构建带标签的消息
+AI -> Storage: 保存用户消息
+AI -> API: 发送请求(/api/ai/chat)
+activate API
+API --> AI: 返回AI响应
+deactivate API
+
+alt 结构化数据响应
+    AI -> AI: 解析结构化数据
+    AI -> AI: 渲染推荐卡片
+else 普通文本响应
+    AI -> AI: 显示文本消息
+end
+
+AI -> Storage: 保存对话历史
+deactivate AI
+
+== 清除历史 ==
+User -> AI: 点击清除历史按钮
+activate AI
+AI -> Storage: 删除历史记录
+AI -> AI: 清空对话界面
+deactivate AI
+
+@enduml

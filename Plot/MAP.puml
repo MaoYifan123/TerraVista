@@ -1,0 +1,44 @@
+@startuml Map Interface Interaction
+
+actor User
+participant "Map Interface" as Map
+participant "Map Controls" as Controls
+participant "Data Layer" as Layer
+participant "Search Service" as Search
+
+User -> Map: 打开地图界面
+activate Map
+
+Map -> Layer: 加载基础地图数据
+activate Layer
+Layer --> Map: 返回地图数据
+deactivate Layer
+
+User -> Controls: 使用缩放控制
+Controls -> Map: 更新地图视图
+Map --> User: 显示缩放后的地图
+
+User -> Controls: 使用平移控制
+Controls -> Map: 更新地图位置
+Map --> User: 显示平移后的地图
+
+User -> Search: 输入搜索关键词
+activate Search
+Search -> Layer: 查询相关数据
+Layer --> Search: 返回搜索结果
+Search --> User: 显示搜索结果
+deactivate Search
+
+User -> Map: 点击地图标记
+Map -> Layer: 获取标记详细信息
+Layer --> Map: 返回详细信息
+Map --> User: 显示信息窗口
+
+User -> Controls: 切换图层显示
+Controls -> Layer: 更新图层状态
+Layer --> Map: 更新地图显示
+Map --> User: 显示更新后的地图
+
+deactivate Map
+
+@enduml
