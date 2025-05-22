@@ -1241,83 +1241,37 @@ export default {
           let result = null;
           for (const keyword of searchStrategies) {
             console.log('Trying search keyword:', keyword);
-
-            result = await new Promise((resolve, reject) => {
-              const placeSearch = new AMap.PlaceSearch({
-                pageSize: 5,
-                pageIndex: 1,
-                extensions: 'all',
-                type: '风景名胜;公园广场;旅游景点;文化场馆;休闲娱乐;自然风光;历史古迹;宗教场所',
-                city: poi.province,
-                citylimit: true,
-                radius: 30000,
-                sortrule: 'distance',
-                autoFitView: true
-              });
-
-              placeSearch.search(keyword, async (status, searchResult) => {
-                console.log('Search result for keyword:', keyword, {
-                  status,
-                  resultCount: searchResult?.poiList?.pois?.length || 0,
-                  firstResult: searchResult?.poiList?.pois?.[0]
+            try {
+              const response = await axios.get(`/poiinfo/info/${poi.id}`);
+              if (response.status === 429) {
+                // 处理限流响应
+                this.$message({
+                  message: '请求过于频繁，请稍后再试',
+                  type: 'warning',
+                  duration: 2000
                 });
-
-                if (status === 'complete' && searchResult?.poiList?.pois?.length > 0) {
-                  // Find the best match among results
-                  const bestMatch = searchResult.poiList.pois.find(p => {
-                    const nameMatch = p.name.includes(keyword) || keyword.includes(p.name);
-                    const typeMatch = p.type && p.type.includes('风景名胜') || p.type.includes('公园') || p.type.includes('旅游');
-                    const distanceMatch = p.distance < 30000; // Within 30km
-                    return nameMatch && (typeMatch || distanceMatch);
-                  });
-
-                  if (bestMatch) {
-                    // 获取详细信息
-                    try {
-                      const detailResult = await new Promise((resolveDetail, rejectDetail) => {
-                        placeSearch.getDetails(bestMatch.id, (status, detail) => {
-                          if (status === 'complete' && detail) {
-                            resolveDetail(detail);
-                          } else {
-                            rejectDetail(new Error('Failed to get POI details'));
-                          }
-                        });
-                      });
-
-                      // 合并基本信息和详细信息
-                      const enrichedResult = {
-                        ...bestMatch,
-                        ...detailResult,
-                        facility: detailResult.facility || bestMatch.facility || '',
-                        open_time: detailResult.open_time || bestMatch.open_time || '',
-                        best_time: detailResult.best_time || bestMatch.best_time || '',
-                        rating: detailResult.rating || bestMatch.rating || '',
-                        price: detailResult.price || bestMatch.price || '',
-                        description: detailResult.description || bestMatch.description || bestMatch.type || bestMatch.address || '暂无介绍'
-                      };
-
-                      resolve(enrichedResult);
-                    } catch (error) {
-                      console.error('Failed to get POI details:', error);
-                      resolve(bestMatch);
-                    }
-                  } else {
-                    resolve(searchResult.poiList.pois[0]);
-                  }
-                } else {
-                  reject(new Error('No matching POI found'));
-                }
-              });
-            }).catch(error => {
-              console.log('Search failed for keyword:', keyword, error);
-              return null;
-            });
-
-            if (result) break;
+                return;
+              }
+              if (response.data) {
+                result = response.data;
+                break;
+              }
+            } catch (error) {
+              if (error.response && error.response.status === 429) {
+                // 处理限流响应
+                this.$message({
+                  message: '请求过于频繁，请稍后再试',
+                  type: 'warning',
+                  duration: 2000
+                });
+                return;
+              }
+              console.error('Error fetching POI details:', error);
+            }
           }
 
           if (!result) {
-            throw new Error('All search strategies failed');
+            throw new Error('No matching POI found');
           }
 
           console.log('Found POI details:', result);

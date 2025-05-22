@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '../router'
+import { ElMessage } from 'element-plus'
 
 const request = axios.create({
     baseURL: '/api',
@@ -37,6 +38,10 @@ request.interceptors.response.use(
                 case 403:
                     // Permission denied
                     router.push('/')
+                    break
+                case 429:
+                    // Rate limit exceeded
+                    ElMessage.error(error.response.data.error || '请求过于频繁，请稍后再试')
                     break
                 default:
                     console.error('API Error:', error.response.data)

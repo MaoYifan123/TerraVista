@@ -68,13 +68,28 @@ export default {
     const handleLogin = async () => {
       loading.value = true
       error.value = ''
-      const success = await userStore.login(form.username, form.password)
-      if (success) {
-        router.push('/')
-      } else {
-        error.value = '登录失败，请重试'
+      try {
+        const result = await userStore.login(form.username, form.password)
+        if (result.success) {
+          router.push('/')
+        } else {
+          error.value = result.error || '登录失败，请重试'
+        }
+      } catch (err) {
+        if (err.response) {
+          if (err.response.status === 429) {
+            error.value = '请求过于频繁，请稍后再试'
+          } else if (err.response.status === 401) {
+            error.value = '用户名或密码错误'
+          } else {
+            error.value = err.response.data?.error || '登录失败，请重试'
+          }
+        } else {
+          error.value = '网络错误，请检查网络连接'
+        }
+      } finally {
+        loading.value = false
       }
-      loading.value = false
     }
 
     return {

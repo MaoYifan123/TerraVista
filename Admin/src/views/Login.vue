@@ -68,8 +68,8 @@ export default {
     const handleLogin = async () => {
       loading.value = true
       error.value = ''
-      const success = await userStore.login(form.username, form.password)
-      if (success) {
+      const result = await userStore.login(form.username, form.password)
+      if (result.success) {
         if (userStore.userRole === 'USER') {
           error.value = '非管理员账号，禁止登录'
           userStore.logout()
@@ -78,7 +78,7 @@ export default {
         }
         router.push('/')
       } else {
-        error.value = '登录失败，请重试'
+        error.value = result.error
       }
       loading.value = false
     }

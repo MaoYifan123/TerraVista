@@ -35,6 +35,11 @@ module.exports = defineConfig({
           '^/api': ''
         },
         logLevel: 'debug',
+      },
+      '/poiinfo': {
+        target: 'http://localhost:9090',
+        changeOrigin: true,
+        logLevel: 'debug',
       }
     },
     client: {
