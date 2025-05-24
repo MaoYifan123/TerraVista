@@ -39,6 +39,11 @@
         <el-icon><Sort /></el-icon>
         绘制路线
       </el-button>
+      <!-- 添加区域选择按钮 -->
+      <el-button type="warning" @click="startAreaSelection">
+        <el-icon><Select /></el-icon>
+        框选区域
+      </el-button>
       <!-- 添加卫星图切换按钮 -->
       <el-switch
           v-model="isSatelliteView"
@@ -465,11 +470,83 @@
         </div>
       </el-drawer>
     </div>
+
+    <!-- 添加底部抽屉 -->
+    <div class="drawer-wrapper bottom-drawer-wrapper">
+      <el-drawer
+          v-model="bottomDrawerVisible"
+          title="区域内景点"
+          direction="btt"
+          :size="bottomDrawerHeight"
+          :with-header="true"
+          :show-close="true"
+          :append-to-body="true"
+          :modal="false"
+          :wrapper-closable="false"
+          :destroy-on-close="false"
+          :lock-scroll="false"
+          :close-on-click-modal="false"
+          :close-on-press-escape="true"
+          class="map-drawer bottom-drawer"
+          modal-class="mask-layer"
+          :style="{ position: 'absolute' }"
+      >
+        <template #header>
+          <div class="drawer-header">
+            <h3>区域内景点 ({{ areaSelectedPois.length }})</h3>
+            <div class="drawer-controls">
+              <el-button-group>
+                <el-button
+                    size="small"
+                    @click="adjustBottomDrawerHeight(-50)"
+                    :disabled="bottomDrawerHeight <= 200"
+                >
+                  <el-icon><Remove /></el-icon>
+                </el-button>
+                <el-button
+                    size="small"
+                    @click="adjustBottomDrawerHeight(50)"
+                    :disabled="bottomDrawerHeight >= 500"
+                >
+                  <el-icon><Plus /></el-icon>
+                </el-button>
+              </el-button-group>
+              <el-button size="small" @click="clearAreaSelection" type="danger">
+                <el-icon><Delete /></el-icon>
+                清除选区
+              </el-button>
+            </div>
+          </div>
+        </template>
+        
+        <div class="area-poi-list" v-if="areaSelectedPois.length > 0">
+          <div class="poi-grid">
+            <div v-for="poi in areaSelectedPois" :key="poi.id" class="poi-item" @click="focusPoi(poi)">
+              <el-card shadow="hover" :body-style="{ padding: '10px' }">
+                <div class="poi-item-content">
+                  <img v-if="poi.imageUrl" :src="poi.imageUrl" class="poi-image" alt="景点图片">
+                  <div class="poi-info">
+                    <h3>{{ poi.name }}</h3>
+                    <p>省份：{{ poi.province }}</p>
+                    <p>类别：{{ poi.category }}</p>
+                    <el-button size="small" type="primary" @click.stop="addPoiToSelected(poi)">
+                      <el-icon><Plus /></el-icon>
+                      添加到路线
+                    </el-button>
+                  </div>
+                </div>
+              </el-card>
+            </div>
+          </div>
+        </div>
+        <el-empty v-else description="当前区域内无景点或未选择区域" />
+      </el-drawer>
+    </div>
   </div>
 </template>
 
 <script>
-import { Search, List, Delete, Close, Rank, Plus, Remove, Sort, Picture, Loading, Link, ArrowUp, ArrowDown, MapLocation } from '@element-plus/icons-vue'
+import { Search, List, Delete, Close, Rank, Plus, Remove, Sort, Picture, Loading, Link, ArrowUp, ArrowDown, MapLocation, Select } from '@element-plus/icons-vue'
 import AMapLoader from '@amap/amap-jsapi-loader'
 import axios from 'axios'
 
@@ -493,7 +570,8 @@ export default {
     Link,
     ArrowUp,
     ArrowDown,
-    MapLocation
+    MapLocation,
+    Select
   },
   data() {
     return {
@@ -574,8 +652,14 @@ export default {
       isSatelliteView: false,
       satelliteLayer: null,
       roadNetLayer: null,
-      normalLayer: null
-      // Removed test-related data properties
+      normalLayer: null,
+      // 添加区域选择相关数据
+      isSelectingArea: false,
+      areaSelectedPois: [],
+      mouseToolInstance: null,
+      selectedAreaPolygon: null,
+      bottomDrawerVisible: false,
+      bottomDrawerHeight: 300
     }
   },
   mounted() {
@@ -589,7 +673,16 @@ export default {
         key: process.env.VUE_APP_AMAP_API_KEY,
         // securityJsCode: process.env.VUE_APP_AMAP_SECURITY_CODE,
         version: '2.0',
-        plugins: ['AMap.ToolBar', 'AMap.Scale', 'AMap.Geocoder', 'AMap.Geolocation', 'AMap.Driving', 'AMap.HawkEye', 'AMap.PlaceSearch'],
+        plugins: [
+          'AMap.ToolBar', 
+          'AMap.Scale', 
+          'AMap.Geocoder', 
+          'AMap.Geolocation', 
+          'AMap.Driving', 
+          'AMap.HawkEye', 
+          'AMap.PlaceSearch',
+          'AMap.MouseTool' // 添加MouseTool插件，用于绘制图形
+        ],
         AMapUI: {
           version: '1.1',
           plugins: ['overlay/SimpleMarker'],
@@ -2870,6 +2963,175 @@ export default {
         this.$message.error('切换地图类型失败，请刷新页面重试');
       }
     },
+
+    // 添加区域选择开始方法
+    startAreaSelection() {
+      if (!this.map) return;
+      
+      // 首先清除已有的选区
+      this.clearAreaSelection();
+      
+      // 初始化鼠标工具实例
+      if (!this.mouseToolInstance) {
+        this.mouseToolInstance = new AMap.MouseTool(this.map);
+      }
+      
+      // 设置正在选择区域状态
+      this.isSelectingArea = true;
+      
+      // 设置鼠标样式
+      this.map.setDefaultCursor('crosshair');
+      
+      // 显示提示信息
+      this.$message({
+        message: '请在地图上按住鼠标左键并拖动来选择区域',
+        type: 'info',
+        duration: 3000
+      });
+      
+      // 开启矩形绘制模式
+      this.mouseToolInstance.rectangle({
+        strokeColor: '#3366FF',
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        fillColor: '#3366FF',
+        fillOpacity: 0.1,
+        strokeStyle: 'dashed'
+      });
+      
+      // 监听绘制完成事件
+      this.mouseToolInstance.on('draw', (event) => {
+        // 保存绘制的矩形
+        this.selectedAreaPolygon = event.obj;
+        
+        // 获取矩形的边界
+        const bounds = this.selectedAreaPolygon.getBounds();
+        
+        // 查找在这个范围内的所有POI
+        this.findPoisInArea(bounds);
+        
+        // 关闭绘制模式
+        this.mouseToolInstance.close();
+        
+        // 重置鼠标样式
+        this.map.setDefaultCursor('auto');
+        
+        // 重置选择状态
+        this.isSelectingArea = false;
+        
+        // 显示底部抽屉
+        this.bottomDrawerVisible = true;
+      });
+    },
+    
+    // 添加清除区域选择的方法
+    clearAreaSelection() {
+      // 清除已绘制的矩形
+      if (this.selectedAreaPolygon) {
+        this.map.remove(this.selectedAreaPolygon);
+        this.selectedAreaPolygon = null;
+      }
+      
+      // 关闭鼠标工具
+      if (this.mouseToolInstance) {
+        this.mouseToolInstance.close();
+      }
+      
+      // 重置鼠标样式
+      this.map.setDefaultCursor('auto');
+      
+      // 清空区域内POI列表
+      this.areaSelectedPois = [];
+      
+      // 关闭底部抽屉
+      this.bottomDrawerVisible = false;
+      
+      // 重置选择状态
+      this.isSelectingArea = false;
+    },
+    
+    // 添加查找区域内POI的方法
+    findPoisInArea(bounds) {
+      // 获取边界的东北角和西南角坐标
+      const northeast = bounds.getNorthEast();
+      const southwest = bounds.getSouthWest();
+      
+      // 过滤出在范围内的POI
+      const poisInArea = this.pois.filter(poi => {
+        const lng = poi.longitudeGcj;
+        const lat = poi.latitudeGcj;
+        
+        // 检查POI是否在矩形范围内
+        return lng >= southwest.lng && lng <= northeast.lng && 
+               lat >= southwest.lat && lat <= northeast.lat;
+      });
+      
+      console.log(`区域内找到 ${poisInArea.length} 个景点`);
+      this.areaSelectedPois = poisInArea;
+      
+      // 如果没有找到POI，显示提示
+      if (poisInArea.length === 0) {
+        this.$message({
+          message: '所选区域内没有找到景点',
+          type: 'warning',
+          duration: 3000
+        });
+      } else {
+        this.$message({
+          message: `区域内找到 ${poisInArea.length} 个景点`,
+          type: 'success',
+          duration: 3000
+        });
+      }
+    },
+    
+    // 添加调整底部抽屉高度的方法
+    adjustBottomDrawerHeight(delta) {
+      const newHeight = this.bottomDrawerHeight + delta;
+      if (newHeight >= 200 && newHeight <= 500) {
+        this.bottomDrawerHeight = newHeight;
+      }
+    },
+    
+    // 添加将区域内POI添加到路线的方法
+    addPoiToSelected(poi) {
+      // 检查是否已在选中列表中
+      if (!this.selectedPois.some(p => p.id === poi.id)) {
+        this.selectedPois.push({
+          ...poi,
+          role: 'waypoint'
+        });
+        
+        // 添加激活标记
+        this.activeMarkers.add(poi.id);
+        
+        // 更新对应的标记
+        const marker = this.markers.find(m => m._poiId === poi.id);
+        if (marker) {
+          this.updateMarkerIcon(marker, true);
+        }
+        
+        // 如果为4A级景点，确保它在地图上有标记
+        if (poi.category === '4A') {
+          this.addPoiMarkers();
+        }
+        
+        this.$message({
+          message: `已添加 ${poi.name} 到路线`,
+          type: 'success',
+          duration: 2000
+        });
+        
+        // 自动打开右侧路线抽屉
+        this.rightDrawerVisible = true;
+      } else {
+        this.$message({
+          message: `${poi.name} 已在路线中`,
+          type: 'info',
+          duration: 2000
+        });
+      }
+    },
   }
 }
 </script>
@@ -3887,5 +4149,41 @@ export default {
 :deep(.poi-info-window .poi-no-photos i) {
   font-size: 24px;
   margin-bottom: 8px;
+}
+
+/* 添加底部抽屉样式 */
+:deep(.bottom-drawer) {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  box-shadow: 0 -2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+:deep(.bottom-drawer .el-drawer__header) {
+  padding: 10px 15px;
+  margin-bottom: 0;
+}
+
+:deep(.bottom-drawer .el-drawer__body) {
+  padding: 0;
+  overflow-y: auto;
+  max-height: calc(100% - 50px);
+}
+
+.area-poi-list {
+  padding: 10px 15px;
+}
+
+.bottom-drawer-wrapper :deep(.el-drawer__mask) {
+  display: none !important;
+}
+
+/* 区域选择相关样式 */
+.area-selection-active {
+  cursor: crosshair !important;
 }
 </style>
